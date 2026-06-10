@@ -44,3 +44,29 @@ Stage Summary:
 - المحركات: محرك الانفجار + محرك التصميم الإنشائي + طبقة التخزين المحلي
 - الواجهة: PWA RTL عربية مع SVG تفاعلي + رسوم نواة المقطع
 - Baseline Constants: 0.00% انحراف مقفل كودياً
+---
+Task ID: 3
+Agent: Main Agent (Super Z)
+Task: تأسيس نظام التخزين الفرعي المتكامل (Storage Subsystem v2) — Repository Pattern + Zod Validation + Sync Queue
+
+Work Log:
+- إنشاء src/lib/storage/db.ts — قاعدة بيانات Dexie مع 4 Object Stores (projects, scenarios, rtmRecords, syncQueue) وفهارس بحث محسنة
+- إنشاء src/lib/storage/storageSchemas.ts — مخططات Zod الصارمة: ProjectRecordSchema, ScenarioRecordSchema, RtmRecordSchema, SyncQueueRecordSchema + دوال validateBeforeWrite وsafeParseWithDefaults
+- إنشاء src/lib/storage/repositories/ProjectRepository.ts — مستودع المشاريع مع Local-First Write + Transaction Safety + حذف متسلسل
+- إنشاء src/lib/storage/repositories/ScenarioRepository.ts — مستودع السيناريوهات مع ربط المحرك الإنشائي + saveStructuralOutput + إعادة تعيين المخرجات عند تحديث المدخلات
+- إنشاء src/lib/storage/repositories/RtmRepository.ts — مستودع تتبع المتطلبات مع تقرير التغطية وسجلات العيوب
+- إنشاء src/lib/storage/repositories/SyncQueueRepository.ts — مستودع طابور المزامنة مع إعادة المحاولة والتنظيف الدوري
+- إنشاء src/lib/storage/index.ts — Unified Export لنظام التخزين
+- تحديث src/lib/structural/index.ts — إضافة تصدير نظام التخزين الجديد
+- إنشاء vitest.config.ts + vitest.setup.ts — إعداد fake-indexeddb للاختبار
+- تثبيت fake-indexeddb كـ devDependency
+- إنشاء __tests__/storage.test.ts — 27 اختبار في 6 أقسام (Schema Validation, Project CRUD, Scenario, RTM, Sync Queue, Transaction Integrity)
+- تشغيل جميع الاختبارات بنجاح: 35/35 PASS (8 هيكلية + 27 تخزين)
+
+Stage Summary:
+- الملفات المنتجة: 7 ملفات TypeScript جديدة لنظام التخزين + ملف اختبارات + إعدادات Vitest
+- البنية: Repository Pattern مع عزل كامل بين UI وقاعدة البيانات
+- التحقق: Zod صارم قبل كل عملية كتابة — منع البيانات التالفة 100%
+- المزامنة: طابور مؤجل مع تسجيل آلي لكل عملية CRUD
+- الاختبارات: 35/35 PASS (TC-STORAGE-001 إلى TC-TXN-002)
+- سلامة المعاملات: حذف متسلسل مشروع→سيناريو→RTM في transaction واحد

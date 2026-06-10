@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════
-// Unified Export - المحركات الثلاثة
+// Unified Export - المحركات الثلاثة + نظام التخزين الفرعي
 // منصة المدقق الديناميكي الموحد V3.0
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -13,5 +13,9 @@ export * from './blastEngine';
 export * from './structuralSchema';
 export * from './structuralEngine';
 
-// طبقة التخزين المحلي
-export * from '../db/database';
+// ─── نظام التخزين الفرعي المتكامل (Storage Subsystem v2) ───
+// الطبقة الجديدة: Repository Pattern + Zod Validation + Sync Queue
+// للوصول المباشر من المكونات:
+//   import { db, projectRepository, scenarioRepository } from '@/lib/storage';
+export { db, projectRepository, scenarioRepository, rtmRepository, syncQueueRepository } from '../storage';
+export type { ProjectRecord, ScenarioRecord, RtmRecord, SyncQueueRecord } from '../storage';
