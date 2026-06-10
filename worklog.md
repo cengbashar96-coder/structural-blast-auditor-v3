@@ -70,3 +70,38 @@ Stage Summary:
 - المزامنة: طابور مؤجل مع تسجيل آلي لكل عملية CRUD
 - الاختبارات: 35/35 PASS (TC-STORAGE-001 إلى TC-TXN-002)
 - سلامة المعاملات: حذف متسلسل مشروع→سيناريو→RTM في transaction واحد
+---
+Task ID: 4
+Agent: Main Agent (Super Z)
+Task: تأسيس نظام المزامنة وإدارة التعارضات + غلافة PWA (Manifest + Service Worker)
+
+Work Log:
+- إنشاء src/lib/storage/conflictPolicy.ts — محرك سياسة حسم التعارضات الحوكمية (Engineering-First)
+  - قاعدة 1: السيادة الحوكمية — Baseline Version مقفل يفرض محلياً قسراً
+  - قاعدة 2: فشل القص الثاقب من السيرفر يُفرض فوراً (حماية المنشأة مقدسة)
+  - قاعدة 3: التاريخ الحاكم — الأحدث زمنياً يربح عند تساوي Baseline
+  - سجل تعارضات (Audit Trail) للشفافية الحوكمية
+- إنشاء src/lib/storage/syncProcessor.ts — معالج طابور المزامنة الذكي
+  - Idempotency: X-Idempotency-Key يمنع تكرار المعالجة
+  - Exponential Backoff: 1s→2s→4s→8s→16s (حد أقصى 5 محاولات)
+  - Race Condition Blocker: معالجة واحدة فقط في أي لحظة
+  - حقن NetworkMonitor + SyncApiClient للاختبار
+  - مراقبة الشبكة التلقائية — بدء المزامنة عند عودة الاتصال
+- إنشاء __tests__/sync.test.ts — 18 اختبار (7 ConflictPolicy + 9 SyncProcessor + 2 E2E)
+- تحديث src/lib/storage/index.ts — إضافة تصديرات ConflictPolicy + SyncQueueProcessor
+- إنشاء src/lib/storage/StorageProvider.tsx — مزود React لتهيئة Dexie + SW + مراقبة الشبكة
+- إنشاء public/manifest.json — PWA Manifest (RTL Arabic، standalone، 8 أحجام أيقونات)
+- إنشاء public/sw.js — Service Worker يدوي (NetworkFirst صفحات + CacheFirst موارد ثابتة)
+- توليد 8 أحجام أيقونات PWA (72→512px) باستخدام z-ai-generate + sharp
+- تحديث src/app/layout.tsx — RTL + PWA metadata + StorageProvider + Service Worker registration
+- تحديث src/app/page.tsx — ربط Repository Layer الجديد بدلاً من database.ts القديم
+- تحديث next.config.ts — توافق Turbopack + إزالة withPWA (SW يدوي)
+- تشغيل جميع الاختبارات بنجاح: 53/53 PASS
+
+Stage Summary:
+- الملفات المنتجة: conflictPolicy.ts + syncProcessor.ts + StorageProvider.tsx + sw.js + manifest.json + 8 أيقونات
+- سياسة التعارضات: 3 قواعد حوكمية (Baseline × القص الثاقب × التاريخ)
+- المزامنة: Idempotency + Exponential Backoff + Race Condition Blocker
+- PWA: Manifest + Service Worker + أيقونات + RTL Arabic
+- الاختبارات: 53/53 PASS (8 هيكلية + 27 تخزين + 18 مزامنة)
+- البناء: next build ناجح (Turbopack + standalone)

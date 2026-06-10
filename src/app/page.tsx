@@ -19,13 +19,10 @@ import {
 } from "@/lib/structural/structuralEngine";
 import type { StructuralInput } from "@/lib/structural/structuralSchema";
 import {
-  db,
-  createProject,
-  getAllProjects,
-  saveBlastResult,
-  saveStructuralResult,
-  type AuditProject,
-} from "@/lib/db/database";
+  projectRepository,
+  scenarioRepository,
+} from "@/lib/storage";
+import type { ProjectRecord } from "@/lib/storage";
 
 // ─── SVG Status Component ───
 function StatusSVG({ color, size = 60 }: { color: "GREEN" | "RED_FLASHING"; size?: number }) {
@@ -80,7 +77,7 @@ function CoreSVG({ e, eLimit, h }: { e: number; eLimit: number; h: number }) {
 export default function Home() {
   // ─── State ───
   const [activeTab, setActiveTab] = useState<"blast" | "structural" | "projects">("blast");
-  const [projects, setProjects] = useState<AuditProject[]>([]);
+  const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [isOnline, setIsOnline] = useState(true);
   const [isCalculating, setIsCalculating] = useState(false);
 
@@ -123,7 +120,7 @@ export default function Home() {
 
   // Load projects
   useEffect(() => {
-    getAllProjects().then(setProjects);
+    projectRepository.getAllProjects().then(setProjects);
   }, []);
 
   // ─── Calculate Blast ───
@@ -171,22 +168,46 @@ export default function Home() {
     }
   }, [blastResult, designMethod, f_c, f_y, h_slab, b_column, h_column, a_tributary, tunnelSpanShort, tunnelSpanLong]);
 
-  // ─── Save Project ───
+  // ─── Save Project (Repository Layer) ───
   const handleSave = useCallback(async () => {
     if (!blastResult || !structuralResult) return;
-    const projectId = await createProject({
-      name: `مشروع تدقيق - ${new Date().toLocaleDateString("ar-SY")}`,
-      description: `قنبلة ${BOMB_DATABASE.find(b => b.id === bombId)?.type || ""} - عمق ${ceilingDepth}م`,
-      bombId, explosiveName, soilName, fallVelocity, fallAngle,
-      ceilingDepth, tunnelSpanShort, tunnelSpanLong, ceilingHeight,
-      designMethod, f_c, f_y, h_slab, b_column, h_column, a_tributary,
-    });
-    await saveBlastResult({ projectId, ...blastResult });
-    await saveStructuralResult({ projectId, ...structuralResult });
-    const updated = await getAllProjects();
-    setProjects(updated);
-    alert("تم حفظ المشروع بنجاح ✓");
-  }, [blastResult, structuralResult, bombId, explosiveName, soilName, fallVelocity, fallAngle, ceilingDepth, tunnelSpanShort, tunnelSpanLong, ceilingHeight, designMethod, f_c, f_y, h_slab, b_column, h_column, a_tributary]);
+    try {
+      // 1. إنشاء مشروع عبر Repository
+      const project = await projectRepository.createProject(
+        `مشروع تدقيق - ${new Date().toLocaleDateString("ar-SY")}`,
+        `قنبلة ${BOMB_DATABASE.find(b => b.id === bombId)?.type || ""} - عمق ${ceilingDepth}م`
+      );
+
+      // 2. إنشاء سيناريو مع المدخلات الإنشائية
+      const scenario = await scenarioRepository.createScenario(
+        project.id,
+        `سيناريو - ${designMethod}`,
+        {
+          designMethod,
+          f_c,
+          f_y,
+          h_slab,
+          b_column,
+          h_column,
+          a_tributary,
+          p_design: blastResult.P_design_kPa,
+          m_dynamic: blastResult.P_design * tunnelSpanShort * 100 * tunnelSpanLong * 100 / 8 / 1000,
+          n_dynamic: blastResult.P_design * tunnelSpanLong * 100 * tunnelSpanShort * 100 / 1000,
+        }
+      );
+
+      // 3. حفظ مخرجات المحرك الإنشائي
+      await scenarioRepository.saveStructuralOutput(scenario.id, structuralResult);
+
+      // 4. تحديث القائمة
+      const updated = await projectRepository.getAllProjects();
+      setProjects(updated);
+      alert("تم حفظ المشروع محلياً عبر Repository Layer ✓");
+    } catch (error) {
+      console.error("خطأ في الحفظ:", error);
+      alert("حدث خطأ أثناء الحفظ!");
+    }
+  }, [blastResult, structuralResult, bombId, ceilingDepth, designMethod, f_c, f_y, h_slab, b_column, h_column, a_tributary, tunnelSpanShort, tunnelSpanLong]);
 
   const selectedBomb = BOMB_DATABASE.find(b => b.id === bombId);
   const selectedSoil = SOIL_TABLE.find(s => s.name === soilName);
@@ -560,7 +581,7 @@ export default function Home() {
                         <div className="text-xs text-slate-400 mt-1">{new Date(p.updatedAt).toLocaleString("ar-SY")}</div>
                       </div>
                       <div className="text-xs text-slate-500 bg-slate-200 px-2 py-1 rounded">
-                        {p.designMethod === "SYRIAN_WSD_2024" ? "WSD سوري" : "USD"}
+                        {p.baselineVersion}
                       </div>
                     </div>
                   ))}

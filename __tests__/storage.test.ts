@@ -169,7 +169,9 @@ describe('ProjectRepository - Local-First Write', () => {
 
   test('TC-PROJ-003: Get all projects sorted by createdAt', async () => {
     await projectRepository.createProject('المشروع أ');
+    await new Promise(r => setTimeout(r, 2)); // ضمان طابع زمني مختلف
     await projectRepository.createProject('المشروع ب');
+    await new Promise(r => setTimeout(r, 2));
     await projectRepository.createProject('المشروع ج');
 
     const projects = await projectRepository.getAllProjects();

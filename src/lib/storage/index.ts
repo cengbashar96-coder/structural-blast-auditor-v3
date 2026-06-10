@@ -44,3 +44,9 @@ export {
   SyncQueueRepository,
   syncQueueRepository,
 } from './repositories/SyncQueueRepository';
+
+// ─── محرك سياسة حسم التعارضات (Conflict Policy) ───
+export { ConflictPolicy, type ConflictResolutionResult, type ConflictSource, type ConflictLogEntry } from './conflictPolicy';
+
+// ─── معالج طابور المزامنة (Sync Queue Processor) ───
+export { SyncQueueProcessor, syncProcessor, type SyncApiClient, type SyncApiResponse, type NetworkMonitor } from './syncProcessor';
