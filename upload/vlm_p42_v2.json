@@ -1,0 +1,28 @@
+{
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "content": "Kin Energy (uJ)  \n2.5*10⁷  \n2.0*10⁷  \n1.5*10⁷  \n1.0*10⁷  \n5.0*10⁶  \n0.0*10⁶  \n0.0 0.5 1.0 1.5 2.0 2.5 3.0  \nTIME (ms)  \n(1)CONC-35MPA  \n\nTot Energy (uJ)  \n3.0*10⁷  \n2.5*10⁷  \n2.0*10⁷  \n1.5*10⁷  \n1.0*10⁷  \n5.0*10⁶  \n0.0*10⁶  \n0.0 0.5 1.0 1.5 2.0 2.5 3.0  \nTIME (ms)  \n(1)CONC-35MPA  \n\nشكل 7  \n\nScanned with CamScanner",
+        "role": "assistant"
+      }
+    }
+  ],
+  "created": 1781115160,
+  "id": "20260611021237f88be7cf0b2d495b",
+  "model": "glm-4.6v",
+  "object": "chat.completion",
+  "request_id": "20260611021237f88be7cf0b2d495b",
+  "usage": {
+    "completion_tokens": 217,
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "prompt_tokens": 1576,
+    "prompt_tokens_details": {
+      "cached_tokens": 18
+    },
+    "total_tokens": 1793
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "content": "run-5  \nCycle 86160  \nTime 3.170E+000 ms  \nUnits mm, ma, ms  \nالشكل التالي يوضح:  \nالقيم النهائية | القيم الأولية | المعادلات  \nالانفعال | الانفعال |  \nالانفعال | 1 γ₀ | r₀,  \nالانفعال | (باستخدام |  \nالانفعال | ./, γ₀ | ./ r₀ |  \nالانفعال |  \nالانفعال |  \nr9",
+        "role": "assistant"
+      }
+    }
+  ],
+  "created": 1781115087,
+  "id": "2026061102112588e7a81134b04407",
+  "model": "glm-4.6v",
+  "object": "chat.completion",
+  "request_id": "2026061102112588e7a81134b04407",
+  "usage": {
+    "completion_tokens": 120,
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "prompt_tokens": 1576,
+    "prompt_tokens_details": {
+      "cached_tokens": 5
+    },
+    "total_tokens": 1696
+  }
+}

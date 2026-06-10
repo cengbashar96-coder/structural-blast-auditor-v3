@@ -1,0 +1,28 @@
+{
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "content": "شكل: 3\n200000\n180000\n160000\n140000\n120000\n100000\n80000\n60000\n40000\n20000\n0\n0\n0.5\n1\n1.5\n2\n2.5\n3\n3.5\nstressxx\nstressyy\nstresszz\ntime(ms)\nstress(kpa)\n0.03\n0.025\n0.02\n0.015\n0.01\n0.005\n0\n0\n0.5\n1\n1.5\n2\n2.5\n3\n3.5\nstrain xx\nstrain yy\nstrain zz\ntime(ms)\nstrain\nScanned with CamScanner",
+        "role": "assistant"
+      }
+    }
+  ],
+  "created": 1781115143,
+  "id": "2026061102121661734fd6f9ae4e5a",
+  "model": "glm-4.6v",
+  "object": "chat.completion",
+  "request_id": "2026061102121661734fd6f9ae4e5a",
+  "usage": {
+    "completion_tokens": 153,
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "prompt_tokens": 1576,
+    "prompt_tokens_details": {
+      "cached_tokens": 18
+    },
+    "total_tokens": 1729
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "content": "\\begin{tabular}{|c|c|c|}\n\\hline\n/·····. & قوة التأثير على السطح & ٢ \\\\\n\\hline\n/·····. & تأثير قوة ثان. & ٠ \\\\\n\\hline\n/·····. & قوة ثان. & ٧ \\\\\n\\hline\n/·····. & قوة & ٢ \\\\\n\\hline\n/·····. & قوة أول. & ١ \\\\\n\\hline\n/·····. & قوة أول. من تأثير ثان. & ٩ \\\\\n\\hline\n/·····. & قوة أول. من تأثير ثان. & ١. \\\\\n\\hline\n\\end{tabular}\n\nبما أن قوة التأثير الأول والثاني معروفتان، فإننا نحصل على:\n\n\\* إذا كان التأثير الأول والثاني متساويين في القوة، فإننا نحصل على نفس المعادلة السابقة، لكن مع تغير المعاملات، حيث نحصل على المعادلة التالية:\n\\[\nh^{i+1} = l_1 + (h^{i} - l_1) \\frac{k_1}{k_1}\n\\]\n\\* شرط: \\( h^{i+1} > l_1 + l_2 \\)\n\n\\[\nh^{i+1,2} = l_1 + l_2 + (h^{i+2} - l_1 - l_1) \\frac{k_1}{k_1}\n\\]\n\\* وبهذا نحصل على المعادلة التالية:",
+        "role": "assistant"
+      }
+    }
+  ],
+  "created": 1781114294,
+  "id": "20260611015806694dcfef0c104735",
+  "model": "glm-4.6v",
+  "object": "chat.completion",
+  "request_id": "20260611015806694dcfef0c104735",
+  "usage": {
+    "completion_tokens": 366,
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "prompt_tokens": 1603,
+    "prompt_tokens_details": {
+      "cached_tokens": 4
+    },
+    "total_tokens": 1969
+  }
+}

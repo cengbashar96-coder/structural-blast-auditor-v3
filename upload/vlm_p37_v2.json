@@ -1,0 +1,28 @@
+{
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "content": "جداول المعاملات المستخدمة في تحليل التشوهات الخطية للهياكل الهندسية\n\n| المعاملات المادية للصخر | المعاملات المادية للأساس | المعاملات المادية |\n|---|---|---|\n| 4 / ٢٢ | r o | ١) أولاً (مطروحاً من) |\n| . / . . . Λ | . / . ) | المعاملات المادية |\n\n(*) ملاحظة: تم حساب المعاملات المادية من المعاملات المادية المذكورة أعلاه\n\n• ملاحظة هامة: تم حساب المعاملات المادية للأساس من المعاملات المادية للصخر و المعاملات المادية للأساس و المعاملات المادية المذكورة أعلاه\n\nAUTODYN-3D v12.1 from ANSYS\nSTRESS ZZ (kPa)\n4.247e+05\n3.490e+05\n2.732e+05\n1.974e+05\n1.216e+05\n4.583e+04\n2.992e+04\n1.057e+05\n1.815e+05\n2.572e+05\n-3.330e+05\n\nmm s\nCycle 86/140\nTime 1.17E+000 ms\nUnits mm, mg, ms\n\n٧Λ\n\nScanned with CamScanner",
+        "role": "assistant"
+      }
+    }
+  ],
+  "created": 1781115070,
+  "id": "2026061102110400cad8db2af445c3",
+  "model": "glm-4.6v",
+  "object": "chat.completion",
+  "request_id": "2026061102110400cad8db2af445c3",
+  "usage": {
+    "completion_tokens": 331,
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "prompt_tokens": 1576,
+    "prompt_tokens_details": {
+      "cached_tokens": 5
+    },
+    "total_tokens": 1907
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "content": "\\begin{align*}\nh' &< \\sum_{i=1}^{i} l_i \\\\\n\\text{حيث: } & i \\text{ عدد الأعمدة} \\\\\n& h' \\text{ ارتفاع القبة من قاعدة المبنى} \\\\\n& l_i \\text{ طول العمود رقم } i\n\\end{align*}\n\n\\textbf{ملاحظة - 8:} يجب أن يكون ارتفاع القبة من المبنى بعد إضافة الارتفاع الإضافي أكبر من أو يساوي الحد الأدنى للارتفاع كما يلي:\n\n\\begin{cases}\nH_{\\min} \\geq h + k_z \\times r - C \\\\\nH_{\\min} \\geq 2h \\\\\nH_{\\min} \\geq 3a\n\\end{cases}\n\n\\textbf{حيث:}\n\n\\begin{tabular}{|c|c|}\n\\hline\n$K_z$ & نوع التربة \\\\\n\\hline\n$1/3$ & صخر \\\\\n\\hline\n$1/4$ & تربة متوسطة كثافة \\\\\n\\hline\n$1$ & تربة ناعمة \\\\\n\\hline\n\\end{tabular}\n\n\\begin{align*}\nC &= 0.027l \\\\\nC &= 0.5d\n\\end{align*}\n\n\\textbf{a:} ارتفاع القبة من المبنى (متر)",
+        "role": "assistant"
+      }
+    }
+  ],
+  "created": 1781114305,
+  "id": "20260611015820497c19cc540b4769",
+  "model": "glm-4.6v",
+  "object": "chat.completion",
+  "request_id": "20260611015820497c19cc540b4769",
+  "usage": {
+    "completion_tokens": 323,
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "prompt_tokens": 1603,
+    "prompt_tokens_details": {
+      "cached_tokens": 5
+    },
+    "total_tokens": 1926
+  }
+}

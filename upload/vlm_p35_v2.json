@@ -1,0 +1,28 @@
+{
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "content": "شكل (5-5) - مساحة الضرر من الضرر  \n\nDamage Area- Damage  \n\nArc  \nCircle  \nRectangle  \n\nشكل (5-5) - مساحة الضرر من الضرر (S-S)  \n\nهذا هو التأثير الذي يحدث في الضرر الحقيقي في الأرض حيث أن الضرر الحقيقي في الأرض يحدث في شكل دائري أو بيضاوي أو شبه دائري.  \n- ويعتبر الضرر الحقيقي في الأرض أن الضرر الحقيقي في الأرض يحدث في شكل دائري أو بيضاوي أو شبه دائري.  \n• لا يوجد ضرر حقيقي في الأرض:  \nوالأضرار التي تحدث في الأرض تكون في شكل دائري أو بيضاوي أو شبه دائري ولكن لا يوجد ضرر حقيقي في الأرض.",
+        "role": "assistant"
+      }
+    }
+  ],
+  "created": 1781115031,
+  "id": "202606110210278ca9b447b1bb43fd",
+  "model": "glm-4.6v",
+  "object": "chat.completion",
+  "request_id": "202606110210278ca9b447b1bb43fd",
+  "usage": {
+    "completion_tokens": 202,
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "prompt_tokens": 1576,
+    "prompt_tokens_details": {
+      "cached_tokens": 5
+    },
+    "total_tokens": 1778
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "content": "\\begin{tabular}{|c|c|}\n\\hline\n\\( K_{gr} \\) & قيمة \\( K_{gr} \\) \\\\\n\\hline\n\\(\\cdot / \\lambda\\) & قيمة \\( K_{gr} \\) عند وجود حصار \\\\\n\\hline\n\\(\\cdot / \\gamma\\) & قيمة \\( K_{gr} \\) عند عدم وجود حصار \\\\\n\\hline\n\\(\\cdot / \\delta\\) & قيمة \\( K_{gr} \\) عند وجود حصار \\\\\n\\hline\n\\end{tabular}\n\n\\( K_{zab} \\) : ثابت تصحيح التأثيرات الجانبية، \\( h \\)\n\n- إذا \\( h \\geq r \\) . \\( r_{0} \\)\n\n\\( k_{zab} = 1 \\)\n\n\\( r_{0} = 0.053 \\sqrt[3]{C} \\)\n\n- إذا \\( r_{0} \\) أقل من \\( h \\) و\\( h \\) أقل من \\( 2r_{0} \\)\n\n\\( k_{zab} = 0.5 \\)\n\n- إذا \\( h \\) أقل من \\( r_{0} \\)\n\n\\( k_{zab} = 0.2 \\)\n\n\\( \\omega \\) : ثابت التأثيرات الجانبية للانفجار في حالة وجود حصار (أ) \\( R \\)\n\n(ب) \\( R \\) : المسافة بين مركز الانفجار ونقطة التأثير.\n\n\\( f(\\beta) \\) : دالة تصحيح التأثيرات الجانبية، \\( \\beta \\)\n\n- إذا \\( r_{0} < R \\leq r_{0} \\) . \\( r \\)\n\n\\( f(\\beta) = 1 \\)\n\n\\( \\circ \\)",
+        "role": "assistant"
+      }
+    }
+  ],
+  "created": 1781114260,
+  "id": "20260611015735a5929d2bb4764796",
+  "model": "glm-4.6v",
+  "object": "chat.completion",
+  "request_id": "20260611015735a5929d2bb4764796",
+  "usage": {
+    "completion_tokens": 399,
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "prompt_tokens": 1603,
+    "prompt_tokens_details": {
+      "cached_tokens": 4
+    },
+    "total_tokens": 2002
+  }
+}

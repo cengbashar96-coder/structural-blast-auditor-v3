@@ -1,0 +1,28 @@
+{
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "content": "1-2a=10 m\n2-h=10 m\n3-h₀=2a/3=10/3=3.33 m\n4-d₀=0.06√(2l₀/h₀)(1+2l₀/f):\nf=6 (factor of Protodiakonov)\nl₀=2a/2=10/2=5 m, so:\nd₀=0.25 m\n5-dₙ=(1.25......1.5)d₀=0.35 m\n6-d_c=(1...2)dₙ=0.7 m\nd_c=dₙ=0.7 m\n7-R²=(2a/2)²+(R−h₀)², R=5.4 m\n8-tan(θ/2)=2a/(R−h₀)=2.41 RAD, θ=2.35 RAD\n9-l=θR=12.69 m\n10-S=1/2×θ×R²=34.263 m²\nالجواب: نصف قطر المنطقة المراد تفجيرها 5.4 م، وعرضها 12.69 م، ومساحتها 34.263 م².\n- ملاحظة: \n• المسافة: \nالمنطقة المراد تفجيرها يجب أن تكون على بعد 20 متر على الأقل من المباني والمنشآت.",
+        "role": "assistant"
+      }
+    }
+  ],
+  "created": 1781114504,
+  "id": "20260611020140edc65808252f4590",
+  "model": "glm-4.6v",
+  "object": "chat.completion",
+  "request_id": "20260611020140edc65808252f4590",
+  "usage": {
+    "completion_tokens": 311,
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "prompt_tokens": 1579,
+    "prompt_tokens_details": {
+      "cached_tokens": 4
+    },
+    "total_tokens": 1890
+  }
+}

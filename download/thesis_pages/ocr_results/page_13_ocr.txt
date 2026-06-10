@@ -1,0 +1,30 @@
+🚀 Initializing Z-AI SDK...
+🚀 Sending vision chat request...
+{
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "content": "\\begin{table}[h]\n\\begin{tabular}{|c|c|}\n\\hline\n\\begin{tabular}{c}\nملاحظات \\\\\nالبيئة \\\\\nالجوية \\\\\n\\end{tabular} & \\begin{tabular}{c}\nقيمة \\\\\nالمعامل \\\\\n\\end{tabular} \\\\\n\\hline\n. r o & لا \\\\\n\\hline\n. . 7 & جدران خرسانية \\\\\n\\hline\n. . V o & خشبية \\\\\n\\hline\n) & لا يوجد ملاحظات \\\\\n\\hline\n\\end{tabular}\n\\end{table}\n\n- r المعاملات التي تؤخذ من الجداول الموضحة في الشكل φ : \n\n$$k_v = k_{ap}(\\cos\\varphi)^2 + k_b(\\sin\\varphi)^2$$\n\nتعتبر المعادلة السابقة مناسبة لتحديد معاملات التأثير للجدران الخرسانية والجدران الخشبية، أما بالنسبة للجدران المعدنية فيجب أخذ معاملات التأثير من الجداول الموضحة في الشكل، وكذلك بالنسبة للجدران المكونة من مواد مختلفة فيجب أخذ معاملات التأثير من الجداول الموضحة في الشكل. \n\nو من المعادلات الموضحة في الشكل : \n\n$$q = k_{gr} k_{zob} \\frac{C^2}{3R} \\omega f(\\beta)$$\n\n: ملاحظة\n\n. Kgr معاملات تأثير الأرض من الجداول الموضحة في الشكل. : \n\n\\pagebreak",
+        "role": "assistant"
+      }
+    }
+  ],
+  "created": 1781116220,
+  "id": "20260611023012cf405f008b21418b",
+  "model": "glm-4.6v",
+  "object": "chat.completion",
+  "request_id": "20260611023012cf405f008b21418b",
+  "usage": {
+    "completion_tokens": 373,
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "prompt_tokens": 2732,
+    "prompt_tokens_details": {
+      "cached_tokens": 6
+    },
+    "total_tokens": 3105
+  }
+}

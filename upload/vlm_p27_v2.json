@@ -1,0 +1,28 @@
+{
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "content": "\\(\\varepsilon_p\\). الاستخدام الأول  \nمن برنامج AUTODYN:  \n\n\\(\\sigma_y = 3.5 \\times 10^5 Kpa\\)  \n\\(\\varepsilon_y = 0.25\\)  \n\nلم يتم استخدام Johnson- cook و shock للتصادم والانفجار لأنهما لا يأخذان في الاعتبار التغيرات في الحجم.  \n• النموذج:  \ncompaction للتصادم والانفجار لأنه لا يأخذ في الاعتبار التغيرات في الحجم.  \n• النماذج الأخرى:  \nJWL للتصادم والانفجار لأنه لا يأخذ في الاعتبار التغيرات في الحجم.  \n\n١٨  \n\nScanned with CamScanner",
+        "role": "assistant"
+      }
+    }
+  ],
+  "created": 1781114523,
+  "id": "202606110202007f882e8b87d84a07",
+  "model": "glm-4.6v",
+  "object": "chat.completion",
+  "request_id": "202606110202007f882e8b87d84a07",
+  "usage": {
+    "completion_tokens": 175,
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "prompt_tokens": 1579,
+    "prompt_tokens_details": {
+      "cached_tokens": 5
+    },
+    "total_tokens": 1754
+  }
+}

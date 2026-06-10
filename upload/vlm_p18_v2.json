@@ -1,0 +1,28 @@
+{
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "content": "ح - ر: دراسة مقاومة الهياكل للانفجارات  \nمن: الدكتور سعد عبدالرحمن و الدكتور أحمد محمد  \n\n(الشكل)  \nح = λ k (P/d²) v cos((α + nα)/2)  \n\nحيث:  \nح = ارتفاع التأثير الميكانيكي للانفجار (من قمة الموجة الضاغطة للانفجار)  \nλ = معامل تصحيح للاعتبارات الجيومترية  \n\nλ | قيمة المعامل  \n---|---  \n19  \n\nScanned with CamScanner",
+        "role": "assistant"
+      }
+    }
+  ],
+  "created": 1781114280,
+  "id": "202606110157568ac290941df94d4e",
+  "model": "glm-4.6v",
+  "object": "chat.completion",
+  "request_id": "202606110157568ac290941df94d4e",
+  "usage": {
+    "completion_tokens": 137,
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "prompt_tokens": 1603,
+    "prompt_tokens_details": {
+      "cached_tokens": 4
+    },
+    "total_tokens": 1740
+  }
+}

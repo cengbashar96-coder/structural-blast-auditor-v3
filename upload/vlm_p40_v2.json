@@ -1,0 +1,28 @@
+{
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "content": "stress(kPa)\n12000\n10000\n8000\n6000\n4000\n2000\n0\n0\n1\n2\n3\n4\ntime(ms)\nstressxx\nstressyy\nstresszz\nstrain\n0.009\n0.008\n0.007\n0.006\n0.005\n0.004\n0.003\n0.002\n0.001\n0\n0\n0.5\n1\n1.5\n2\n2.5\n3\n3.5\ntime(ms)\nPL.STN.XX\nPL.STN.YY\nPL.STN.ZZ\n۱\nScanned with CamScanner",
+        "role": "assistant"
+      }
+    }
+  ],
+  "created": 1781115122,
+  "id": "202606110211599e41f301a8c1490b",
+  "model": "glm-4.6v",
+  "object": "chat.completion",
+  "request_id": "202606110211599e41f301a8c1490b",
+  "usage": {
+    "completion_tokens": 147,
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "prompt_tokens": 1576,
+    "prompt_tokens_details": {
+      "cached_tokens": 18
+    },
+    "total_tokens": 1723
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "content": "### Extracted Text, Equations, and Numbers  \n\n#### 1. Title  \nبعض من نتائج التحليل على النموذج المبني:  \n\n#### 2. Subtitle  \nالنموذج الأول: الأعمدة الخرسانية المسلحة، من 0.0 إلى 0.2 متر من قاعدة العمود  \n\n#### 3. Software/Version  \nAUTODYN 3D v12.1 from ANSYS  \n\n#### 4. Damage Scale (Color Bar)  \nDAMAGE [All]  \n- 1.000e+00  \n- 9.000e-01  \n- 8.000e-01  \n- 7.000e-01  \n- 6.000e-01  \n- 5.000e-01  \n- 4.000e-01  \n- 3.000e-01  \n- 2.000e-01  \n- 1.000e-01  \n- 0.000e+00  \n\n#### 5. Simulation Parameters  \n- run-4  \n- Cycle 145066  \n- Time 3.172E+000 ms  \n- Units mm, mg, ms  \n\n#### 6. Arabic Text (Analysis)  \nبعض من نتائج التحليل على النموذج المبني، ويمكن ملاحظة أن الأعمدة الخرسانية المسلحة، من 0.0 إلى 0.2 متر من قاعدة العمود، قد تحطمت بشكل كامل. وإذا نظرنا إلى هذه الصورة، فإننا نرى أن هذه الأعمدة قد تحطمت بشكل كامل من الأعمدة الخرسانية المسلحة.  \n\n#### 7. Section Title  \nالتحليل:  \n\n#### 8. Page Number  \n٧٧  \n\n#### 9. Scanning Note  \nScanned with CamScanner",
+        "role": "assistant"
+      }
+    }
+  ],
+  "created": 1781114697,
+  "id": "20260611020452cddf984980924509",
+  "model": "glm-4.6v",
+  "object": "chat.completion",
+  "request_id": "20260611020452cddf984980924509",
+  "usage": {
+    "completion_tokens": 405,
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "prompt_tokens": 1576,
+    "prompt_tokens_details": {
+      "cached_tokens": 4
+    },
+    "total_tokens": 1981
+  }
+}

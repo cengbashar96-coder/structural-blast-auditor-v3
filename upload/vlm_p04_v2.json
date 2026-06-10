@@ -1,0 +1,28 @@
+{
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "content": "بشكل عام يمكن تقسيم التأثيرات الميكانيكية للانفجارات إلى نوعين رئيسيين:  \n- التأثيرات المباشرة: وهي التأثيرات التي تنتج عن الضغط المباشر للانفجار.  \n- التأثيرات غير المباشرة: وهي التأثيرات التي تنتج عن الحركة الأرضية أو الحركة الهوائية الناتجة عن الانفجار.  \n● من المهم ملاحظة أن التأثيرات غير المباشرة قد تكون أكثر ضررًا من التأثيرات المباشرة، وغالبًا ما تكون أكثر شيوعًا.  \n- التأثيرات الميكانيكية: وهي التأثيرات التي تنتج عن الضغط المباشر للانفجار.  \n- التأثيرات غير الميكانيكية: وهي التأثيرات التي تنتج عن الحركة الأرضية أو الحركة الهوائية الناتجة عن الانفجار.  \nتم استخدام برنامج AUTODYN في التحليلات الحاسوبية.  \nبشكل عام يمكن تقسيم التأثيرات الميكانيكية للانفجارات إلى نوعين رئيسيين:  \n- التأثيرات المباشرة: وهي التأثيرات التي تنتج عن الضغط المباشر للانفجار.  \n- التأثيرات غير المباشرة: وهي التأثيرات التي تنتج عن الحركة الأرضية أو الحركة الهوائية الناتجة عن الانفجار.  \n\n[Graph Description: A pressure-time graph with the y-axis labeled \"PRESSURE (P)\" and the x-axis labeled \"TIME\". The graph shows a curve starting at ambient pressure, rising to a peak pressure \\( P_{so} \\) at point \\( b \\), then declining. The area under the curve is labeled \"IMPULSE (i.e., AREA UNDER CURVE)\". The curve has a positive phase (from \\( t_A \\) to \\( t_0 \\)) and a negative phase (from \\( t_0 \\) to \\( t_g \\)). The x-axis marks points \\( t_A \\), \\( a \\), \\( c \\), \\( t_1 \\), \\( t_0 \\), and \\( t_g \\).]",
+        "role": "assistant"
+      }
+    }
+  ],
+  "created": 1781114188,
+  "id": "2026061101562247b3404f4d9247b9",
+  "model": "glm-4.6v",
+  "object": "chat.completion",
+  "request_id": "2026061101562247b3404f4d9247b9",
+  "usage": {
+    "completion_tokens": 493,
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "prompt_tokens": 1653,
+    "prompt_tokens_details": {
+      "cached_tokens": 4
+    },
+    "total_tokens": 2146
+  }
+}
