@@ -57,12 +57,12 @@ export interface SyncUIState {
   globalStatus: 'IDLE' | 'SYNCING' | 'SUCCESS_WITH_CONFLICTS' | 'COMPLETED' | 'CRITICAL_ERROR';
 }
 
-/** واجهة تمثل كائنات طابور الانتظار المحلي الميداني */
+/** واجهة تمثل كائنات طابور الانتظار المحلي الميداني — مطابقة لـ SovereignSyncQueueRecord */
 interface LocalSyncQueueItem {
   eventId: string;
   status: 'PENDING' | 'SYNCING' | 'COMPLETED' | 'FAILED' | 'RETRYABLE';
-  localAttemptCount: number;
-  lastServerError?: string;
+  retries: number;
+  lastError?: string;
 }
 
 /** واجهة قرار التعارض — البيانات اللازمة لحسم التعارض محلياً */
@@ -238,7 +238,7 @@ export class SyncFeedbackAdapter {
             if (localEvent) {
               await syncQueueTable.update(localEvent, {
                 status: 'RETRYABLE',
-                lastServerError: retry.error,
+                lastError: retry.error,
               });
             }
           }
