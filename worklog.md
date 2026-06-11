@@ -146,3 +146,48 @@ Stage Summary:
 - Accessibility: SVG مع aria-label + sr-only + role=figure لقارئات الشاشة
 - الاختبارات: 69/69 PASS (8 هيكلية + 27 تخزين + 18 مزامنة + 16 PWA/UI)
 - الأداء: Initial Load سريع عبر Static Shell + Code Splitting للجزر التفاعلية
+---
+Task ID: 6
+Agent: Main Agent (Super Z)
+Task: المرحلة الرابعة والأخيرة — شاشة الـ RTM وغرفة التدقيق الجنائي (Live Governance & Audit Trail)
+
+Work Log:
+- إنشاء app/dashboard/rtm/page.tsx — Server Component مع Server Action مؤمن (runLiveBenchmarksAction)
+- إنشاء components/rtm/rtm-dashboard-controller.tsx — جزيرة التحكم الكلية (تقرأ من IndexedDB مباشرة)
+  - بطاقات إحصائيات حوكمية: إجمالي RTM، معدل النجاح، مزامنة معلقة، تعارضات مسجلة
+  - إشعارات حية بدل alert() — دورة حياة كاملة مع إغلاق يدوي
+  - تحديث تلقائي كل 5 ثوانٍ لمراقبة التغييرات
+- إنشاء components/rtm/rtm-table.tsx — جدول المتطلبات الحي
+  - بحث ديناميكي بـ FR ID / TC ID / Scenario ID
+  - فلترة حسب الحالة (ALL / PASSED / FAILED)
+  - Accessibility معزز: caption, scope, aria-label, sr-only
+  - ملخص التغطية حسب حالة الاختبار في الأسفل
+  - زر Re-run Benchmarks مع useTransition
+- إنشاء components/rtm/audit-trail.tsx — شريط التتبع الزمني
+  - دمج أحداث المزامنة + التعارضات في سجل زمني واحد مرتب
+  - ألوان حسب الخطورة: info / warning / critical
+  - aria-live="polite" + role="log" لقارئات الشاشة
+- إنشاء components/rtm/defect-log.tsx — لوحة رصد العيوب الإنشائية
+  - فلترة تلقائية للسجلات FAILED فقط
+  - عرض تفصيلي لكل عيب: DEFECT-ID, حالة الاختبار، سجل العيب
+  - شريط حالة مقفل: LOCKED // REJECTION_TRIGGERED
+- تحديث app/dashboard/layout.tsx — إضافة روابط تنقل باستخدام Next.js Link
+  - رابط /dashboard → المشاريع وحالات التدقيق
+  - رابط /dashboard/rtm → مصفوفة المتطلبات RTM
+- إنشاء __tests__/rtm.test.ts — 19 اختبار جديد:
+  - TC-RTM-001 إلى 007: تسجيل RTM (PASSED/FAILED، منع يتيم، Zod، جلب حسب TC/FR)
+  - TC-COV-001/002: تقرير التغطية (نسب دقيقة، قاعدة فارغة)
+  - TC-DEF-001/002: سجل العيوب (FAILED فقط، فارغ عند النجاح)
+  - TC-AUDIT-001 إلى 005: Audit Trail (فارغ، Baseline، PUNCHING_FAILURE، ترتيب زمني، مسح)
+  - TC-LIVE-001 إلى 003: خط بيانات حي كامل (Engine→RTM→Coverage→Defect، Server Action، IndexedDB)
+- تشغيل جميع الاختبارات: 88/88 PASS عبر 5 ملفات
+- البناء: next build ناجح — /dashboard/rtm يُولّد بنجاح
+- محاولة رفع إلى GitHub فشلت بسبب إلغاء الـ PAT
+
+Stage Summary:
+- الملفات المنتجة: 6 ملفات جديدة + تحديث 1 ملف + 1 ملف اختبارات
+- البنية: Server Component (page.tsx) + Client Island Controller (rtm-dashboard-controller.tsx)
+- خط البيانات المصحح: السيرفر يبني الهيكل — جزر العميل تقرأ من IndexedDB مباشرة
+- الـ RTM حي: لا Mock Data — جميع البيانات من Dexie/IndexedDB المحلية
+- الاختبارات: 88/88 PASS (8 هيكلية + 27 تخزين + 18 مزامنة + 16 PWA/UI + 19 RTM)
+- GitHub: PAT تم إلغاؤه — يحتاج رمز جديد للرفع
