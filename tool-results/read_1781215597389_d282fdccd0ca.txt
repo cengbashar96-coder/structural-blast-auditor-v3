@@ -1,0 +1,1052 @@
+     1→// ═══════════════════════════════════════════════════════════════════════
+     2→// 🧪 اختبارات تكامل خط أنابيب المزامنة المتقدمة — Sync Pipeline Integration Tests
+     3→// ═══════════════════════════════════════════════════════════════════════
+     4→// منصة المدقق الديناميكي الموحد V3.0
+     5→//
+     6→// بلاطة الأمان الحصينة لمنظومة المزامنة الكاملة:
+     7→//   - الدالة النقية calculateSyncResolution (معزولة عن التخزين)
+     8→//   - SyncFeedbackAdapter.processServerReport (تكامل Dexie + UI Store)
+     9→//   - حسم التعارضات السيادية ذرياً
+    10→//   - الفشل المرن والتراجع الذري
+    11→//   - عدم التحديث الاستباقي للواجهة (Premature UI Update Prevention)
+    12→//
+    13→// ⚙️ متطلبات البيئة الصارمة:
+    14→//   ١. اعتماد مطلق على الذاكرة (Pure In-Memory) — يُمنع أي I/O خارجي
+    15→//   ٢. fake-indexeddb/auto يُوفر IndexedDB في Node.js (مُعد مسبقاً في vitest.setup.ts)
+    16→//   ٣. استيراد مخطط Dexie المركزي المعتمد في التطبيق (بدون إعادة تعريف)
+    17→//   ٤. عزل صارم بين الاختبارات عبر beforeEach + afterEach
+    18→//   ٥. Fixtures/Factories موحدة تمنع تكرار الكود
+    19→// ═══════════════════════════════════════════════════════════════════════
+    20→
+    21→import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
+    22→
+    23→// ═══════════════════════════════════════════════════════════════════════
+    24→// 📦 استيراد وحدات الإنتاج الفعلية — اختبار ذات المخطط الهيكلي المعتمد
+    25→// ═══════════════════════════════════════════════════════════════════════
+    26→
+    27→// قاعدة البيانات السيادية — نفس المخطط المعتمد في التطبيق
+    28→import {
+    29→  sovereignDB,
+    30→  type SovereignSyncQueueRecord,
+    31→  type LocalProjectRecord,
+    32→  type LocalScenarioRecord,
+    33→} from '@/lib/db/sovereign-local-db';
+    34→
+    35→// محول التغذية الراجعة الميداني + الدالة النقية
+    36→import {
+    37→  SyncFeedbackAdapter,
+    38→  calculateSyncResolution,
+    39→  type SyncUIState,
+    40→} from '@/lib/client/sync-feedback-adapter';
+    41→
+    42→// مخزن حالة الواجهة الخارجي
+    43→import { syncUIStore } from '@/lib/client/sync-ui-store';
+    44→
+    45→// أنواع تقرير الخادم — استيراد آمن عبر import type (ملف 'use server')
+    46→import type {
+    47→  SingleEventResult,
+    48→  BatchReconciliationReport,
+    49→} from '@/actions/sync/reconcile-action';
+    50→
+    51→// ═══════════════════════════════════════════════════════════════════════
+    52→// 🏭 مصانع البيانات الثابتة (Fixtures / Factories)
+    53→// ═══════════════════════════════════════════════════════════════════════
+    54→// كائنات موحدة تُستخدم عبر جميع الاختبارات لمنع تكرار الكود
+    55→// وضمان ثبات البيانات المدخلة.
+    56→
+    57→/** مولّد معرفات فريدة بسيط للاختبار */
+    58→let testIdCounter = 0;
+    59→function nextTestId(prefix: string): string {
+    60→  return `${prefix}-TEST-${++testIdCounter}`;
+    61→}
+    62→
+    63→/** مصنع أحداث طابور الانتظار الميداني */
+    64→function createSyncQueueItem(
+    65→  overrides: Partial<SovereignSyncQueueRecord> = {}
+    66→): SovereignSyncQueueRecord {
+    67→  return {
+    68→    contextId: overrides.contextId ?? nextTestId('CTX'),
+    69→    eventId: overrides.eventId ?? nextTestId('EVT'),
+    70→    action: overrides.action ?? 'UPDATE_SCENARIO',
+    71→    payload: overrides.payload ?? { id: nextTestId('SCN'), title: 'سيناريو اختباري' },
+    72→    payloadHash: overrides.payloadHash ?? `hash-${Math.random().toString(36).slice(2, 10)}`,
+    73→    status: overrides.status ?? 'PENDING',
+    74→    retries: overrides.retries ?? 0,
+    75→    timestamp: overrides.timestamp ?? Date.now(),
+    76→    ...overrides,
+    77→  };
+    78→}
+    79→
+    80→/** مصنع سجلات المشروع الميداني */
+    81→function createLocalProject(
+    82→  overrides: Partial<LocalProjectRecord> = {}
+    83→): LocalProjectRecord {
+    84→  return {
+    85→    id: overrides.id ?? nextTestId('PRJ'),
+    86→    name: overrides.name ?? 'مشروع اختباري',
+    87→    description: overrides.description ?? 'وصف تجريبي',
+    88→    baselineVersion: overrides.baselineVersion ?? 'V3.0-Locked',
+    89→    createdAt: overrides.createdAt ?? Date.now(),
+    90→    updatedAt: overrides.updatedAt ?? Date.now(),
+    91→  };
+    92→}
+    93→
+    94→/** مصنع سجلات السيناريو الميداني */
+    95→function createLocalScenario(
+    96→  overrides: Partial<LocalScenarioRecord> = {}
+    97→): LocalScenarioRecord {
+    98→  return {
+    99→    id: overrides.id ?? nextTestId('SCN'),
+   100→    projectId: overrides.projectId ?? nextTestId('PRJ'),
+   101→    title: overrides.title ?? 'سيناريو القص الثاقب',
+   102→    inputs: overrides.inputs ?? {
+   103→      designMethod: 'SYRIAN_WSD_2024',
+   104→      f_c: 40, f_y: 400, h_slab: 2000,
+   105→      b_column: 800, h_column: 800,
+   106→      a_tributary: 15, p_design: 200,
+   107→    },
+   108→    outputs: overrides.outputs ?? undefined,
+   109→    createdAt: overrides.createdAt ?? Date.now(),
+   110→    updatedAt: overrides.updatedAt ?? Date.now(),
+   111→  };
+   112→}
+   113→
+   114→// ─── مصانع تقارير الخادم (Server Report Factories) ───
+   115→
+   116→/** مصنع نتيجة حدث واحدة — حالة SUCCESS */
+   117→function createSuccessResult(
+   118→  eventId: string,
+   119→  contextId: string = 'CTX-TEST',
+   120→  action: string = 'UPDATE_SCENARIO'
+   121→): SingleEventResult {
+   122→  return {
+   123→    eventId,
+   124→    contextId,
+   125→    status: 'SUCCESS',
+   126→    appliedAction: action,
+   127→  };
+   128→}
+   129→
+   130→/** مصنع نتيجة حدث واحدة — حالة BYPASS */
+   131→function createBypassResult(
+   132→  eventId: string,
+   133→  contextId: string = 'CTX-TEST',
+   134→  action: string = 'CREATE_PROJECT'
+   135→): SingleEventResult {
+   136→  return {
+   137→    eventId,
+   138→    contextId,
+   139→    status: 'BYPASS',
+   140→    appliedAction: action,
+   141→  };
+   142→}
+   143→
+   144→/** مصنع نتيجة حدث واحدة — حالة CONFLICT */
+   145→function createConflictResult(
+   146→  eventId: string,
+   147→  contextId: string = 'CTX-TEST',
+   148→  action: string = 'UPDATE_SCENARIO',
+   149→  serverVersion: Record<string, unknown> = {}
+   150→): SingleEventResult {
+   151→  return {
+   152→    eventId,
+   153→    contextId,
+   154→    status: 'CONFLICT',
+   155→    appliedAction: action,
+   156→    error: 'تعارض في الإصدارات: نسخة الخادم أحدث.',
+   157→    serverVersion,
+   158→  };
+   159→}
+   160→
+   161→/** مصنع نتيجة حدث واحدة — حالة FAILED */
+   162→function createFailedResult(
+   163→  eventId: string,
+   164→  contextId: string = 'CTX-TEST',
+   165→  action: string = 'UPDATE_SCENARIO',
+   166→  error: string = 'خطأ داخلي حرج في نظام المعالجة.'
+   167→): SingleEventResult {
+   168→  return {
+   169→    eventId,
+   170→    contextId,
+   171→    status: 'FAILED',
+   172→    appliedAction: action,
+   173→    error,
+   174→  };
+   175→}
+   176→
+   177→/** مصنع تقرير التسوية الخادومي الكامل */
+   178→function createReconciliationReport(
+   179→  results: SingleEventResult[],
+   180→  overrides: Partial<BatchReconciliationReport> = {}
+   181→): BatchReconciliationReport {
+   182→  const succeeded = results.filter((r) => r.status === 'SUCCESS').length;
+   183→  const bypassed = results.filter((r) => r.status === 'BYPASS').length;
+   184→  const conflicts = results.filter((r) => r.status === 'CONFLICT').length;
+   185→  const failed = results.filter((r) => r.status === 'FAILED').length;
+   186→
+   187→  return {
+   188→    success: failed === 0 && conflicts === 0,
+   189→    batchContextId: overrides.batchContextId ?? 'CTX-TEST-BATCH',
+   190→    summaryCounters: {
+   191→      totalReceived: results.length,
+   192→      succeeded,
+   193→      bypassed,
+   194→      conflicts,
+   195→      failed,
+   196→    },
+   197→    results,
+   198→    ...overrides,
+   199→  };
+   200→}
+   201→
+   202→// ═══════════════════════════════════════════════════════════════════════
+   203→// 🧹 عزل الحالات — التهيئة والتنظيف الصارم
+   204→// ═══════════════════════════════════════════════════════════════════════
+   205→
+   206→/** نسخة المحول الميداني — تُعاد إنشاؤها لكل اختبار */
+   207→let feedbackAdapter: SyncFeedbackAdapter;
+   208→
+   209→/** تسجيل تحديثات الـ UI Store — لفحص الترتيب والتوقيت */
+   210→let capturedUIUpdates: Partial<SyncUIState>[];
+   211→
+   212→/** دالة تحديث UI مُراقَبة — تسجّل كل استدعاء */
+   213→function trackedUIStoreUpdate(state: Partial<SyncUIState>): void {
+   214→  capturedUIUpdates.push(state);
+   215→  syncUIStore.update(state);
+   216→}
+   217→
+   218→beforeEach(async () => {
+   219→  // تصفير عداد المعرفات لضمان ثبات الاختبارات
+   220→  testIdCounter = 0;
+   221→
+   222→  // تسجيل تحديثات الواجهة
+   223→  capturedUIUpdates = [];
+   224→
+   225→  // إعادة تعيين مخزن الواجهة إلى الحالة الابتدائية
+   226→  syncUIStore.reset();
+   227→
+   228→  // تنظيف جداول قاعدة البيانات السيادية بالكامل — عزل صارم
+   229→  await sovereignDB.transaction(
+   230→    'rw',
+   231→    [sovereignDB.syncQueue, sovereignDB.scenarios, sovereignDB.projects, sovereignDB.rtmRecords],
+   232→    async () => {
+   233→      await sovereignDB.syncQueue.clear();
+   234→      await sovereignDB.scenarios.clear();
+   235→      await sovereignDB.projects.clear();
+   236→      await sovereignDB.rtmRecords.clear();
+   237→    }
+   238→  );
+   239→
+   240→  // إنشاء نسخة جديدة من المحول الميداني مرتبطة بقاعدة البيانات السيادية
+   241→  feedbackAdapter = new SyncFeedbackAdapter(sovereignDB);
+   242→});
+   243→
+   244→afterEach(async () => {
+   245→  // تنظيف صارم بعد كل اختبار — مسح كافة الجداول
+   246→  await sovereignDB.transaction(
+   247→    'rw',
+   248→    [sovereignDB.syncQueue, sovereignDB.scenarios, sovereignDB.projects, sovereignDB.rtmRecords],
+   249→    async () => {
+   250→      await sovereignDB.syncQueue.clear();
+   251→      await sovereignDB.scenarios.clear();
+   252→      await sovereignDB.projects.clear();
+   253→      await sovereignDB.rtmRecords.clear();
+   254→    }
+   255→  );
+   256→
+   257→  // إعادة تعيين مخزن الواجهة
+   258→  syncUIStore.reset();
+   259→
+   260→  // تنظيف سجل التحديثات
+   261→  capturedUIUpdates = [];
+   262→});
+   263→
+   264→// ═══════════════════════════════════════════════════════════════════════
+   265→// 🔶 الجزء الأول: اختبار الدالة النقية المعزولة (Pure Function Unit Test)
+   266→// ═══════════════════════════════════════════════════════════════════════
+   267→// فحص calculateSyncResolution بمعزل تام عن طبقة التخزين.
+   268→// الهدف: إثبات دقة قرار المعالجة (المصفوفات المستهدفة)
+   269→// دون أي اعتمادية على IndexedDB أو Dexie.
+   270→
+   271→describe('calculateSyncResolution — الدالة النقية المعزولة', () => {
+   272→
+   273→  test('TC-PURE-001: تصنيف SUCCESS → حذف من الطابور', () => {
+   274→    const results: SingleEventResult[] = [
+   275→      createSuccessResult('EVT-001'),
+   276→      createSuccessResult('EVT-002'),
+   277→    ];
+   278→
+   279→    const resolution = calculateSyncResolution(results);
+   280→
+   281→    // SUCCESS يجب أن يُدرج في قائمة الحذف
+   282→    expect(resolution.idsToDelete).toEqual(['EVT-001', 'EVT-002']);
+   283→    expect(resolution.conflictsToResolve).toHaveLength(0);
+   284→    expect(resolution.eventsToRetry).toHaveLength(0);
+   285→  });
+   286→
+   287→  test('TC-PURE-002: تصنيف BYPASS → حذف من الطابور (معالجة مسبقة)', () => {
+   288→    const results: SingleEventResult[] = [
+   289→      createBypassResult('EVT-BYPASS-001'),
+   290→    ];
+   291→
+   292→    const resolution = calculateSyncResolution(results);
+   293→
+   294→    // BYPASS يُعامل مثل SUCCESS — حدث مستقر يُحذف
+   295→    expect(resolution.idsToDelete).toEqual(['EVT-BYPASS-001']);
+   296→    expect(resolution.conflictsToResolve).toHaveLength(0);
+   297→    expect(resolution.eventsToRetry).toHaveLength(0);
+   298→  });
+   299→
+   300→  test('TC-PURE-003: تصنيف CONFLICT → حذف + حسم تعارض سيادي', () => {
+   301→    const serverScenarioVersion = {
+   302→      id: 'SCN-CONFLICT',
+   303→      projectId: 'PRJ-001',
+   304→      title: 'نسخة الخادم المعتمدة',
+   305→      inputs: { designMethod: 'SYRIAN_WSD_2024', f_c: 50 },
+   306→      updatedAt: Date.now(),
+   307→    };
+   308→
+   309→    const results: SingleEventResult[] = [
+   310→      createConflictResult('EVT-CONFLICT-001', 'CTX-TEST', 'UPDATE_SCENARIO', serverScenarioVersion),
+   311→    ];
+   312→
+   313→    const resolution = calculateSyncResolution(results);
+   314→
+   315→    // CONFLICT: الحدث يُحذف من الطابور (حُسم) + يُضاف لقائمة الحسم
+   316→    expect(resolution.idsToDelete).toEqual(['EVT-CONFLICT-001']);
+   317→    expect(resolution.conflictsToResolve).toHaveLength(1);
+   318→    expect(resolution.conflictsToResolve[0].eventId).toBe('EVT-CONFLICT-001');
+   319→    expect(resolution.conflictsToResolve[0].targetTable).toBe('scenarios');
+   320→    expect(resolution.conflictsToResolve[0].serverVersion).toEqual(serverScenarioVersion);
+   321→    expect(resolution.eventsToRetry).toHaveLength(0);
+   322→  });
+   323→
+   324→  test('TC-PURE-004: CONFLICT بدون serverVersion → حذف فقط (حسم بلا بيانات)', () => {
+   325→    const results: SingleEventResult[] = [
+   326→      {
+   327→        eventId: 'EVT-NO-SERVER',
+   328→        contextId: 'CTX-TEST',
+   329→        status: 'CONFLICT',
+   330→        appliedAction: 'UPDATE_SCENARIO',
+   331→        error: 'تعارض بدون نسخة خادم',
+   332→        // لا يوجد serverVersion
+   333→      },
+   334→    ];
+   335→
+   336→    const resolution = calculateSyncResolution(results);
+   337→
+   338→    // الحدث يُحذف لكن لا توجد بيانات لحسم التعارض
+   339→    expect(resolution.idsToDelete).toEqual(['EVT-NO-SERVER']);
+   340→    expect(resolution.conflictsToResolve).toHaveLength(0);
+   341→    expect(resolution.eventsToRetry).toHaveLength(0);
+   342→  });
+   343→
+   344→  test('TC-PURE-005: تصنيف FAILED → إعادة محاولة', () => {
+   345→    const results: SingleEventResult[] = [
+   346→      createFailedResult('EVT-FAIL-001', 'CTX-TEST', 'UPDATE_SCENARIO', 'خطأ شبكة'),
+   347→    ];
+   348→
+   349→    const resolution = calculateSyncResolution(results);
+   350→
+   351→    // FAILED يُضاف لقائمة إعادة المحاولة — لا يُحذف من الطابور
+   352→    expect(resolution.idsToDelete).toHaveLength(0);
+   353→    expect(resolution.conflictsToResolve).toHaveLength(0);
+   354→    expect(resolution.eventsToRetry).toHaveLength(1);
+   355→    expect(resolution.eventsToRetry[0].eventId).toBe('EVT-FAIL-001');
+   356→    expect(resolution.eventsToRetry[0].error).toBe('خطأ شبكة');
+   357→  });
+   358→
+   359→  test('TC-PURE-006: مزيج مختلط من جميع الحالات — تصنيف دقيق', () => {
+   360→    const results: SingleEventResult[] = [
+   361→      createSuccessResult('EVT-S-001'),
+   362→      createBypassResult('EVT-B-001'),
+   363→      createConflictResult('EVT-C-001', 'CTX-TEST', 'UPDATE_SCENARIO', { id: 'SCN-001', projectId: 'PRJ-001' }),
+   364→      createFailedResult('EVT-F-001', 'CTX-TEST', 'UPDATE_SCENARIO', 'فشل حرج'),
+   365→      createSuccessResult('EVT-S-002'),
+   366→    ];
+   367→
+   368→    const resolution = calculateSyncResolution(results);
+   369→
+   370→    // 3 أحداث تُحذف: SUCCESS + BYPASS + CONFLICT
+   371→    expect(resolution.idsToDelete).toEqual(['EVT-S-001', 'EVT-B-001', 'EVT-C-001', 'EVT-S-002']);
+   372→    // تعارض واحد
+   373→    expect(resolution.conflictsToResolve).toHaveLength(1);
+   374→    expect(resolution.conflictsToResolve[0].targetTable).toBe('scenarios');
+   375→    // فشل واحد
+   376→    expect(resolution.eventsToRetry).toHaveLength(1);
+   377→    expect(resolution.eventsToRetry[0].error).toBe('فشل حرج');
+   378→  });
+   379→
+   380→  test('TC-PURE-007: CONFLICT مع مشروع (بدون projectId) → targetTable = projects', () => {
+   381→    const serverProjectVersion = {
+   382→      id: 'PRJ-SERVER',
+   383→      name: 'مشروع الخادم المحمي',
+   384→      baselineVersion: 'V3.0-Locked',
+   385→    };
+   386→
+   387→    const results: SingleEventResult[] = [
+   388→      createConflictResult('EVT-PRJ-001', 'CTX-TEST', 'UPDATE_PROJECT', serverProjectVersion),
+   389→    ];
+   390→
+   391→    const resolution = calculateSyncResolution(results);
+   392→
+   393→    expect(resolution.conflictsToResolve).toHaveLength(1);
+   394→    // بدون projectId → يُصنف كمشروع
+   395→    expect(resolution.conflictsToResolve[0].targetTable).toBe('projects');
+   396→  });
+   397→
+   398→  test('TC-PURE-008: مصفوفة فارغة → لا إجراءات', () => {
+   399→    const resolution = calculateSyncResolution([]);
+   400→
+   401→    expect(resolution.idsToDelete).toHaveLength(0);
+   402→    expect(resolution.conflictsToResolve).toHaveLength(0);
+   403→    expect(resolution.eventsToRetry).toHaveLength(0);
+   404→  });
+   405→});
+   406→
+   407→// ═══════════════════════════════════════════════════════════════════════
+   408→// 🔷 الجزء الثاني: اختبارات المصب والتكامل الفعلي (Integration States)
+   409→// ═══════════════════════════════════════════════════════════════════════
+   410→// الفحص هنا يتمحور حول التحقق من "الحالة النهائية المستقرة للبيانات"
+   411→// (State Assertions) داخل جداول Dexie وفي الـ syncUIStore
+   412→// بعد اكتمال المعاملة الحيوية.
+   413→
+   414→describe('SyncFeedbackAdapter — تكامل المعاملات الذرية وحالة الواجهة', () => {
+   415→
+   416→  // ═══════════════════════════════════════════════════════════════════
+   417→  // 🟢 سيناريو 1: النجاح التام (Happy Path Sync)
+   418→  // ═══════════════════════════════════════════════════════════════════
+   419→
+   420→  describe('سيناريو النجاح التام — Happy Path Sync', () => {
+   421→
+   422→    test('TC-INT-001: حدث ناجح يُحذف من الطابور والواجهة تنتقل لـ COMPLETED', async () => {
+   423→      // ─── ترتيب: وضع حدث معلق في syncQueue ───
+   424→      const queueItem = createSyncQueueItem({
+   425→        eventId: 'EVT-SUCCESS-001',
+   426→        action: 'UPDATE_SCENARIO',
+   427→        status: 'PENDING',
+   428→      });
+   429→      await sovereignDB.syncQueue.add(queueItem);
+   430→
+   431→      // التحقق من وجود الحدث قبل المعالجة
+   432→      const beforeProcess = await sovereignDB.syncQueue
+   433→        .where('eventId')
+   434→        .equals('EVT-SUCCESS-001')
+   435→        .count();
+   436→      expect(beforeProcess).toBe(1);
+   437→
+   438→      // ─── فعل: محاكاة تقرير خادم ناجح ───
+   439→      const report = createReconciliationReport([
+   440→        createSuccessResult('EVT-SUCCESS-001'),
+   441→      ]);
+   442→
+   443→      await feedbackAdapter.processServerReport(report, trackedUIStoreUpdate);
+   444→
+   445→      // ─── تأكيد: الحدث حُذف تماماً من طابور الانتظار ───
+   446→      const afterProcess = await sovereignDB.syncQueue
+   447→        .where('eventId')
+   448→        .equals('EVT-SUCCESS-001')
+   449→        .count();
+   450→      expect(afterProcess).toBe(0);
+   451→
+   452→      // ─── تأكيد: حالة الواجهة انتقلت لـ COMPLETED ───
+   453→      const snapshot = syncUIStore.getSnapshot();
+   454→      expect(snapshot.globalStatus).toBe('COMPLETED');
+   455→      expect(snapshot.isSyncing).toBe(false);
+   456→      expect(snapshot.summary.succeeded).toBe(1);
+   457→    });
+   458→
+   459→    test('TC-INT-002: عدم تحديث الواجهة استباقياً — COMPLETED يظهر فقط بعد الـ Commit', async () => {
+   460→      // ─── ترتيب ───
+   461→      const queueItem = createSyncQueueItem({
+   462→        eventId: 'EVT-NO-PREEMPT',
+   463→        status: 'PENDING',
+   464→      });
+   465→      await sovereignDB.syncQueue.add(queueItem);
+   466→
+   467→      const report = createReconciliationReport([
+   468→        createSuccessResult('EVT-NO-PREEMPT'),
+   469→      ]);
+   470→
+   471→      // ─── فعل ───
+   472→      await feedbackAdapter.processServerReport(report, trackedUIStoreUpdate);
+   473→
+   474→      // ─── تأكيد: التحديثات تمت بالترتيب الصحيح ───
+   475→      // الأول: إشارة بدء المزامنة
+   476→      expect(capturedUIUpdates.length).toBeGreaterThanOrEqual(2);
+   477→      expect(capturedUIUpdates[0]).toEqual(
+   478→        expect.objectContaining({
+   479→          isSyncing: true,
+   480→          globalStatus: 'SYNCING',
+   481→        })
+   482→      );
+   483→
+   484→      // الأخير: إشارة اكتمال بعد الـ Commit
+   485→      const lastUpdate = capturedUIUpdates[capturedUIUpdates.length - 1];
+   486→      expect(lastUpdate).toEqual(
+   487→        expect.objectContaining({
+   488→          isSyncing: false,
+   489→          globalStatus: 'COMPLETED',
+   490→        })
+   491→      );
+   492→
+   493→      // لا يوجد أي تحديث استباقي بالحالة COMPLETED قبل الأخير
+   494→      const prematureCompletions = capturedUIUpdates.slice(0, -1).filter(
+   495→        (u) => u.globalStatus === 'COMPLETED'
+   496→      );
+   497→      expect(prematureCompletions).toHaveLength(0);
+   498→    });
+   499→
+   500→    test('TC-INT-003: حدث BYPASS يُحذف ويُسجل كمتجاوز في العدادات', async () => {
+   501→      // ─── ترتيب ───
+   502→      const queueItem = createSyncQueueItem({
+   503→        eventId: 'EVT-BYPASS-001',
+   504→        action: 'CREATE_PROJECT',
+   505→        status: 'PENDING',
+   506→      });
+   507→      await sovereignDB.syncQueue.add(queueItem);
+   508→
+   509→      // ─── فعل ───
+   510→      const report = createReconciliationReport([
+   511→        createBypassResult('EVT-BYPASS-001'),
+   512→      ]);
+   513→
+   514→      await feedbackAdapter.processServerReport(report, trackedUIStoreUpdate);
+   515→
+   516→      // ─── تأكيد ───
+   517→      const afterProcess = await sovereignDB.syncQueue
+   518→        .where('eventId')
+   519→        .equals('EVT-BYPASS-001')
+   520→        .count();
+   521→      expect(afterProcess).toBe(0);
+   522→
+   523→      const snapshot = syncUIStore.getSnapshot();
+   524→      expect(snapshot.globalStatus).toBe('COMPLETED');
+   525→      expect(snapshot.summary.bypassed).toBe(1);
+   526→      expect(snapshot.summary.succeeded).toBe(0);
+   527→    });
+   528→
+   529→    test('TC-INT-004: دفعة مختلطة — SUCCESS + BYPASS تُحذف معاً', async () => {
+   530→      // ─── ترتيب: حدثان معلقان ───
+   531→      await sovereignDB.syncQueue.add(
+   532→        createSyncQueueItem({ eventId: 'EVT-S-001', status: 'PENDING' })
+   533→      );
+   534→      await sovereignDB.syncQueue.add(
+   535→        createSyncQueueItem({ eventId: 'EVT-B-001', status: 'PENDING' })
+   536→      );
+   537→
+   538→      // ─── فعل ───
+   539→      const report = createReconciliationReport([
+   540→        createSuccessResult('EVT-S-001'),
+   541→        createBypassResult('EVT-B-001'),
+   542→      ]);
+   543→
+   544→      await feedbackAdapter.processServerReport(report, trackedUIStoreUpdate);
+   545→
+   546→      // ─── تأكيد: كلاهما حُذفا ───
+   547→      const remaining = await sovereignDB.syncQueue.count();
+   548→      expect(remaining).toBe(0);
+   549→
+   550→      const snapshot = syncUIStore.getSnapshot();
+   551→      expect(snapshot.summary.succeeded).toBe(1);
+   552→      expect(snapshot.summary.bypassed).toBe(1);
+   553→    });
+   554→  });
+   555→
+   556→  // ═══════════════════════════════════════════════════════════════════
+   557→  // 🟡 سيناريو 2: حسم التعارضات الإنشائية السيادية
+   558→  // ═══════════════════════════════════════════════════════════════════
+   559→
+   560→  describe('سيناريو حسم التعارضات السيادية — Conflict Resolution Execution', () => {
+   561→
+   562→    test('TC-INT-005: تعارض سيناريو → إزالة من الطابور + Atomic Put لنسخة الخادم', async () => {
+   563→      // ─── ترتيب: حدث تعديل سيناريو في الطابور ───
+   564→      const scenarioId = 'SCN-CONFLICT-001';
+   565→      const queueItem = createSyncQueueItem({
+   566→        eventId: 'EVT-CONFLICT-001',
+   567→        action: 'UPDATE_SCENARIO',
+   568→        payload: { id: scenarioId, title: 'نسخة محلية قديمة', projectId: 'PRJ-001' },
+   569→        status: 'PENDING',
+   570→      });
+   571→      await sovereignDB.syncQueue.add(queueItem);
+   572→
+   573→      // بيانات السيناريو المحلي الحالي
+   574→      await sovereignDB.scenarios.add(
+   575→        createLocalScenario({ id: scenarioId, title: 'نسخة محلية قديمة' })
+   576→      );
+   577→
+   578→      // نسخة الخادم المعتمدة — الأحدث حوكمياً
+   579→      const serverScenarioVersion = createLocalScenario({
+   580→        id: scenarioId,
+   581→        title: 'نسخة الخادم المعتمدة — محدثة',
+   582→        projectId: 'PRJ-001',
+   583→      });
+   584→
+   585→      // ─── فعل: تمرير تقرير تعارض مع نسخة الخادم ───
+   586→      const report = createReconciliationReport([
+   587→        createConflictResult(
+   588→          'EVT-CONFLICT-001',
+   589→          'CTX-TEST',
+   590→          'UPDATE_SCENARIO',
+   591→          serverScenarioVersion as unknown as Record<string, unknown>
+   592→        ),
+   593→      ]);
+   594→
+   595→      await feedbackAdapter.processServerReport(report, trackedUIStoreUpdate);
+   596→
+   597→      // ─── تأكيد ١: الحدث أُزيل من الطابور (حُسم) ───
+   598→      const remainingInQueue = await sovereignDB.syncQueue
+   599→        .where('eventId')
+   600→        .equals('EVT-CONFLICT-001')
+   601→        .count();
+   602→      expect(remainingInQueue).toBe(0);
+   603→
+   604→      // ─── تأكيد ٢: نسخة الخادم طُبقت ذرياً على جدول السيناريوهات ───
+   605→      const updatedScenario = await sovereignDB.scenarios.get(scenarioId);
+   606→      expect(updatedScenario).toBeDefined();
+   607→      expect(updatedScenario!.title).toBe('نسخة الخادم المعتمدة — محدثة');
+   608→
+   609→      // ─── تأكيد ٣: الواجهة تعكس حالة التعارض المحسوم ───
+   610→      const snapshot = syncUIStore.getSnapshot();
+   611→      expect(snapshot.globalStatus).toBe('SUCCESS_WITH_CONFLICTS');
+   612→      expect(snapshot.summary.conflicts).toBe(1);
+   613→    });
+   614→
+   615→    test('TC-INT-006: تعارض مشروع → Atomic Put في جدول المشاريع', async () => {
+   616→      // ─── ترتيب ───
+   617→      const projectId = 'PRJ-CONFLICT-001';
+   618→      await sovereignDB.syncQueue.add(
+   619→        createSyncQueueItem({
+   620→          eventId: 'EVT-PRJ-CONFLICT',
+   621→          action: 'UPDATE_PROJECT',
+   622→          payload: { id: projectId, name: 'مشروع محلي' },
+   623→          status: 'PENDING',
+   624→        })
+   625→      );
+   626→
+   627→      // مشروع محلي حالي
+   628→      await sovereignDB.projects.add(
+   629→        createLocalProject({ id: projectId, name: 'مشروع محلي' })
+   630→      );
+   631→
+   632→      // نسخة الخادم — بدون حقل projectId لذلك تُصنف كمشروع
+   633→      const serverProjectVersion = createLocalProject({
+   634→        id: projectId,
+   635→        name: 'مشروع الخادم المحدّث — خط أساس مقفل',
+   636→        baselineVersion: 'V3.0-Locked',
+   637→      });
+   638→
+   639→      // ─── فعل ───
+   640→      const report = createReconciliationReport([
+   641→        createConflictResult(
+   642→          'EVT-PRJ-CONFLICT',
+   643→          'CTX-TEST',
+   644→          'UPDATE_PROJECT',
+   645→          serverProjectVersion as unknown as Record<string, unknown>
+   646→        ),
+   647→      ]);
+   648→
+   649→      await feedbackAdapter.processServerReport(report, trackedUIStoreUpdate);
+   650→
+   651→      // ─── تأكيد: المشروع حُدّث بنسخة الخادم ───
+   652→      const updatedProject = await sovereignDB.projects.get(projectId);
+   653→      expect(updatedProject).toBeDefined();
+   654→      expect(updatedProject!.name).toBe('مشروع الخادم المحدّث — خط أساس مقفل');
+   655→      expect(updatedProject!.baselineVersion).toBe('V3.0-Locked');
+   656→
+   657→      // ─── تأكيد: الواجهة ───
+   658→      const snapshot = syncUIStore.getSnapshot();
+   659→      expect(snapshot.globalStatus).toBe('SUCCESS_WITH_CONFLICTS');
+   660→    });
+   661→
+   662→    test('TC-INT-007: تعارض مع سيناريو غير موجود محلياً → Put يُنشئه (Upsert)', async () => {
+   663→      // ─── ترتيب: حدث تعارض لكن السيناريو غير موجود محلياً ───
+   664→      const scenarioId = 'SCN-NEW-FROM-SERVER';
+   665→      await sovereignDB.syncQueue.add(
+   666→        createSyncQueueItem({
+   667→          eventId: 'EVT-UPSERT-001',
+   668→          action: 'UPDATE_SCENARIO',
+   669→          payload: { id: scenarioId },
+   670→          status: 'PENDING',
+   671→        })
+   672→      );
+   673→
+   674→      // لا يوجد سيناريو محلي بهذا المعرف
+   675→
+   676→      const serverVersion = createLocalScenario({
+   677→        id: scenarioId,
+   678→        title: 'سيناريو جديد من الخادم',
+   679→        projectId: 'PRJ-001',
+   680→      });
+   681→
+   682→      // ─── فعل ───
+   683→      const report = createReconciliationReport([
+   684→        createConflictResult(
+   685→          'EVT-UPSERT-001',
+   686→          'CTX-TEST',
+   687→          'UPDATE_SCENARIO',
+   688→          serverVersion as unknown as Record<string, unknown>
+   689→        ),
+   690→      ]);
+   691→
+   692→      await feedbackAdapter.processServerReport(report, trackedUIStoreUpdate);
+   693→
+   694→      // ─── تأكيد: Dexie.put يعمل كـ upsert — يُنشئ السيناريو ───
+   695→      const newScenario = await sovereignDB.scenarios.get(scenarioId);
+   696→      expect(newScenario).toBeDefined();
+   697→      expect(newScenario!.title).toBe('سيناريو جديد من الخادم');
+   698→    });
+   699→  });
+   700→
+   701→  // ═══════════════════════════════════════════════════════════════════
+   702→  // 🔴 سيناريو 3: الفشل المرن والتراجع الذري
+   703→  // ═══════════════════════════════════════════════════════════════════
+   704→
+   705→  describe('سيناريو الفشل المرن والتراجع الذري — Fault Tolerance & Atomic Rollback', () => {
+   706→
+   707→    test('TC-INT-008: حدث فاشل يبقى في الطابور وتتحول حالته إلى RETRYABLE', async () => {
+   708→      // ─── ترتيب: حدث ميداني في الطابور ───
+   709→      const queueItem = createSyncQueueItem({
+   710→        eventId: 'EVT-FAIL-001',
+   711→        action: 'UPDATE_SCENARIO',
+   712→        status: 'PENDING',
+   713→      });
+   714→      await sovereignDB.syncQueue.add(queueItem);
+   715→
+   716→      // ─── فعل: تمرير تقرير فاشل ───
+   717→      const report = createReconciliationReport([
+   718→        createFailedResult('EVT-FAIL-001', 'CTX-TEST', 'UPDATE_SCENARIO', 'خطأ شبكة حرج'),
+   719→      ]);
+   720→
+   721→      await feedbackAdapter.processServerReport(report, trackedUIStoreUpdate);
+   722→
+   723→      // ─── تأكيد ١: الحدث يبقى في الطابور — لم يُحذف ───
+   724→      const remainingItem = await sovereignDB.syncQueue
+   725→        .where('eventId')
+   726→        .equals('EVT-FAIL-001')
+   727→        .first();
+   728→      expect(remainingItem).toBeDefined();
+   729→
+   730→      // ─── تأكيد ٢: حالة السجل تتحول إلى RETRYABLE ───
+   731→      expect(remainingItem!.status).toBe('RETRYABLE');
+   732→
+   733→      // ─── تأكيد ٣: رسالة الخطأ مُسجّلة ───
+   734→      expect(remainingItem!.lastError).toBe('خطأ شبكة حرج');
+   735→
+   736→      // ─── تأكيد ٤: الواجهة تعكس حالة الخطأ الحرج ───
+   737→      const snapshot = syncUIStore.getSnapshot();
+   738→      expect(snapshot.globalStatus).toBe('CRITICAL_ERROR');
+   739→      expect(snapshot.summary.failed).toBe(1);
+   740→    });
+   741→
+   742→    test('TC-INT-009: فشل كامل → التراجع الذري يحمي جدول السيناريوهات من التشويه', async () => {
+   743→      // ─── ترتيب: سيناريو محلي أصلي + حدث في الطابور ───
+   744→      const scenarioId = 'SCN-PROTECTED';
+   745→      const originalScenarioTitle = 'السيناريو الأصلي المحمي — لا يجب أن يتغير';
+   746→
+   747→      await sovereignDB.scenarios.add(
+   748→        createLocalScenario({ id: scenarioId, title: originalScenarioTitle })
+   749→      );
+   750→
+   751→      await sovereignDB.syncQueue.add(
+   752→        createSyncQueueItem({
+   753→          eventId: 'EVT-ROLLBACK-001',
+   754→          action: 'UPDATE_SCENARIO',
+   755→          payload: { id: scenarioId },
+   756→          status: 'PENDING',
+   757→        })
+   758→      );
+   759→
+   760→      // تسجيل حالة السيناريو قبل المعالجة
+   761→      const scenarioBefore = await sovereignDB.scenarios.get(scenarioId);
+   762→      expect(scenarioBefore!.title).toBe(originalScenarioTitle);
+   763→
+   764→      // ─── فعل: تمرير تقرير فاشل ───
+   765→      const report = createReconciliationReport([
+   766→        createFailedResult('EVT-ROLLBACK-001', 'CTX-TEST', 'UPDATE_SCENARIO', 'فشل الخادم'),
+   767→      ]);
+   768→
+   769→      await feedbackAdapter.processServerReport(report, trackedUIStoreUpdate);
+   770→
+   771→      // ─── تأكيد ١: جدول السيناريوهات لم يتغير إطلاقاً ───
+   772→      const scenarioAfter = await sovereignDB.scenarios.get(scenarioId);
+   773→      expect(scenarioAfter).toBeDefined();
+   774→      expect(scenarioAfter!.title).toBe(originalScenarioTitle);
+   775→
+   776→      // ─── تأكيد ٢: الحدث بقي في الطابور بحالة RETRYABLE ───
+   777→      const queueItem = await sovereignDB.syncQueue
+   778→        .where('eventId')
+   779→        .equals('EVT-ROLLBACK-001')
+   780→        .first();
+   781→      expect(queueItem).toBeDefined();
+   782→      expect(queueItem!.status).toBe('RETRYABLE');
+   783→    });
+   784→
+   785→    test('TC-INT-010: فشل داخل المعاملة → Rollback تلقائي كامل (Dexie Safety Net)', async () => {
+   786→      // ─── ترتيب: بيانات أولية في جداول متعددة ───
+   787→      await sovereignDB.scenarios.add(
+   788→        createLocalScenario({ id: 'SCN-BEFORE-TX', title: 'قبل المعاملة' })
+   789→      );
+   790→      await sovereignDB.projects.add(
+   791→        createLocalProject({ id: 'PRJ-BEFORE-TX', name: 'مشروع قبل المعاملة' })
+   792→      );
+   793→
+   794→      // تقرير يسبب خطأ — سنحاكي فشل المعاملة عبر بيانات غير صالحة
+   795→      // من خلال حقن دالة updateUIStore ترمي خطأ بعد التحديث الأول
+   796→      const faultyUIUpdate = vi.fn((_state: Partial<SyncUIState>) => {
+   797→        // المحاكاة: تحديث الواجهة الأولي ينجح
+   798→        syncUIStore.update(_state);
+   799→      });
+   800→
+   801→      // ─── فعل: تمرير تقرير فاشل ───
+   802→      const report = createReconciliationReport([
+   803→        createFailedResult('EVT-TX-FAIL', 'CTX-TEST', 'UPDATE_SCENARIO', 'خطأ المعاملة'),
+   804→      ]);
+   805→
+   806→      // لا نتوقع رمي خطأ هنا — الفشل يُعالج بأمان
+   807→      await feedbackAdapter.processServerReport(report, faultyUIUpdate);
+   808→
+   809→      // ─── تأكيد: البيانات الأصلية لم تتأثر ───
+   810→      const scenarioStillExists = await sovereignDB.scenarios.get('SCN-BEFORE-TX');
+   811→      expect(scenarioStillExists).toBeDefined();
+   812→      expect(scenarioStillExists!.title).toBe('قبل المعاملة');
+   813→
+   814→      const projectStillExists = await sovereignDB.projects.get('PRJ-BEFORE-TX');
+   815→      expect(projectStillExists).toBeDefined();
+   816→      expect(projectStillExists!.name).toBe('مشروع قبل المعاملة');
+   817→    });
+   818→  });
+   819→
+   820→  // ═══════════════════════════════════════════════════════════════════
+   821→  // 🔵 سيناريوهات إضافية: تكامل متقدم
+   822→  // ═══════════════════════════════════════════════════════════════════
+   823→
+   824→  describe('سيناريوهات التكامل المتقدم — Advanced Integration', () => {
+   825→
+   826→    test('TC-INT-011: دفعة مختلطة كاملة — SUCCESS + CONFLICT + FAILED + BYPASS', async () => {
+   827→      // ─── ترتيب: 4 أحداث في الطابور ───
+   828→      const scenarioId = 'SCN-MIXED';
+   829→      await sovereignDB.syncQueue.bulkAdd([
+   830→        createSyncQueueItem({ eventId: 'EVT-MIX-S', status: 'PENDING' }),
+   831→        createSyncQueueItem({ eventId: 'EVT-MIX-B', status: 'PENDING' }),
+   832→        createSyncQueueItem({ eventId: 'EVT-MIX-C', status: 'PENDING', payload: { id: scenarioId, projectId: 'PRJ-001' } }),
+   833→        createSyncQueueItem({ eventId: 'EVT-MIX-F', status: 'PENDING' }),
+   834→      ]);
+   835→
+   836→      // سيناريو محلي يُراد تعديله
+   837→      await sovereignDB.scenarios.add(
+   838→        createLocalScenario({ id: scenarioId, title: 'نسخة محلية' })
+   839→      );
+   840→
+   841→      const serverVersion = createLocalScenario({
+   842→        id: scenarioId,
+   843→        title: 'نسخة الخادم المعتمدة',
+   844→        projectId: 'PRJ-001',
+   845→      });
+   846→
+   847→      // ─── فعل: تقرير مختلط ───
+   848→      const report = createReconciliationReport([
+   849→        createSuccessResult('EVT-MIX-S'),
+   850→        createBypassResult('EVT-MIX-B'),
+   851→        createConflictResult('EVT-MIX-C', 'CTX-TEST', 'UPDATE_SCENARIO', serverVersion as unknown as Record<string, unknown>),
+   852→        createFailedResult('EVT-MIX-F', 'CTX-TEST', 'UPDATE_SCENARIO', 'خطأ شبكة'),
+   853→      ]);
+   854→
+   855→      await feedbackAdapter.processServerReport(report, trackedUIStoreUpdate);
+   856→
+   857→      // ─── تأكيد ١: 3 أحداث حُذفت (SUCCESS + BYPASS + CONFLICT) ───
+   858→      const remainingQueue = await sovereignDB.syncQueue.toArray();
+   859→      expect(remainingQueue).toHaveLength(1);
+   860→      expect(remainingQueue[0].eventId).toBe('EVT-MIX-F');
+   861→      expect(remainingQueue[0].status).toBe('RETRYABLE');
+   862→
+   863→      // ─── تأكيد ٢: السيناريو حُدّث بنسخة الخادم ───
+   864→      const updatedScenario = await sovereignDB.scenarios.get(scenarioId);
+   865→      expect(updatedScenario!.title).toBe('نسخة الخادم المعتمدة');
+   866→
+   867→      // ─── تأكيد ٣: الواجهة تعكس الفشل الحرج (لوجود FAILED) ───
+   868→      const snapshot = syncUIStore.getSnapshot();
+   869→      expect(snapshot.globalStatus).toBe('CRITICAL_ERROR');
+   870→      expect(snapshot.summary.succeeded).toBe(1);
+   871→      expect(snapshot.summary.bypassed).toBe(1);
+   872→      expect(snapshot.summary.conflicts).toBe(1);
+   873→      expect(snapshot.summary.failed).toBe(1);
+   874→    });
+   875→
+   876→    test('TC-INT-012: عدّاد lastSyncTime يُحدَّث فقط بعد المعاملة الناجحة', async () => {
+   877→      // ─── ترتيب ───
+   878→      expect(syncUIStore.getSnapshot().lastSyncTime).toBeNull();
+   879→
+   880→      await sovereignDB.syncQueue.add(
+   881→        createSyncQueueItem({ eventId: 'EVT-TIME-001', status: 'PENDING' })
+   882→      );
+   883→
+   884→      const report = createReconciliationReport([
+   885→        createSuccessResult('EVT-TIME-001'),
+   886→      ]);
+   887→
+   888→      // ─── فعل ───
+   889→      await feedbackAdapter.processServerReport(report, trackedUIStoreUpdate);
+   890→
+   891→      // ─── تأكيد: lastSyncTime تحدد فقط بعد النجاح ───
+   892→      const snapshot = syncUIStore.getSnapshot();
+   893→      expect(snapshot.lastSyncTime).not.toBeNull();
+   894→      expect(snapshot.lastSyncTime!.getTime()).toBeGreaterThan(0);
+   895→    });
+   896→
+   897→    test('TC-INT-013: تقرير فارغ → لا تغيير في الواجهة', async () => {
+   898→      // ─── ترتيب ───
+   899→      const initialState = syncUIStore.getSnapshot();
+   900→
+   901→      // ─── فعل: تقرير بلا نتائج ───
+   902→      const report = createReconciliationReport([]);
+   903→
+   904→      await feedbackAdapter.processServerReport(report, trackedUIStoreUpdate);
+   905→
+   906→      // ─── تأكيد: الحالة لم تتغير ───
+   907→      const snapshot = syncUIStore.getSnapshot();
+   908→      expect(snapshot.globalStatus).toBe('COMPLETED');
+   909→      expect(snapshot.summary.succeeded).toBe(0);
+   910→      expect(snapshot.summary.failed).toBe(0);
+   911→    });
+   912→
+   913→    test('TC-INT-014: أحداث فاشلة متعددة — جميعها تبقى في الطابور بحالة RETRYABLE', async () => {
+   914→      // ─── ترتيب: 3 أحداث فاشلة ───
+   915→      await sovereignDB.syncQueue.bulkAdd([
+   916→        createSyncQueueItem({ eventId: 'EVT-FAIL-A', status: 'PENDING' }),
+   917→        createSyncQueueItem({ eventId: 'EVT-FAIL-B', status: 'PENDING' }),
+   918→        createSyncQueueItem({ eventId: 'EVT-FAIL-C', status: 'PENDING' }),
+   919→      ]);
+   920→
+   921→      // ─── فعل ───
+   922→      const report = createReconciliationReport([
+   923→        createFailedResult('EVT-FAIL-A', 'CTX-TEST', 'UPDATE_SCENARIO', 'خطأ A'),
+   924→        createFailedResult('EVT-FAIL-B', 'CTX-TEST', 'UPDATE_SCENARIO', 'خطأ B'),
+   925→        createFailedResult('EVT-FAIL-C', 'CTX-TEST', 'UPDATE_SCENARIO', 'خطأ C'),
+   926→      ]);
+   927→
+   928→      await feedbackAdapter.processServerReport(report, trackedUIStoreUpdate);
+   929→
+   930→      // ─── تأكيد: جميع الأحداث الثلاثة بقيت في الطابور ───
+   931→      const retryableItems = await sovereignDB.syncQueue
+   932→        .where('status')
+   933→        .equals('RETRYABLE')
+   934→        .toArray();
+   935→      expect(retryableItems).toHaveLength(3);
+   936→
+   937→      // ─── تأكيد: كل حدث يحمل رسالة الخطأ الخاصة به ───
+   938→      const errorMessages = retryableItems.map((item) => item.lastError);
+   939→      expect(errorMessages).toContain('خطأ A');
+   940→      expect(errorMessages).toContain('خطأ B');
+   941→      expect(errorMessages).toContain('خطأ C');
+   942→    });
+   943→  });
+   944→});
+   945→
+   946→// ═══════════════════════════════════════════════════════════════════════
+   947→// 🏛️ الجزء الثالث: اختبارات مخزن الواجهة الخارجي (syncUIStore)
+   948→// ═══════════════════════════════════════════════════════════════════════
+   949→// فحص ثبات المرجعية (Stable Snapshot) وعزل SSR والتحديثات الذرية.
+   950→
+   951→describe('syncUIStore — مخزن الواجهة الخارجي المحصّن', () => {
+   952→
+   953→  test('TC-STORE-001: getSnapshot يُعيد نفس المرجع ما لم تتغير البيانات', () => {
+   954→    const snapshot1 = syncUIStore.getSnapshot();
+   955→    const snapshot2 = syncUIStore.getSnapshot();
+   956→
+   957→    // نفس المرجع — لا يُنشئ كائناً جديداً
+   958→    expect(snapshot1).toBe(snapshot2);
+   959→  });
+   960→
+   961→  test('TC-STORE-002: update ببيانات متطابقة لا يُنشئ لقطة جديدة', () => {
+   962→    const snapshot1 = syncUIStore.getSnapshot();
+   963→
+   964→    // تحديث بنفس البيانات الحالية
+   965→    syncUIStore.update({
+   966→      isSyncing: false,
+   967→      globalStatus: 'IDLE',
+   968→    });
+   969→
+   970→    const snapshot2 = syncUIStore.getSnapshot();
+   971→
+   972→    // المرجع لم يتغير — لا إشعار للمستمعين
+   973→    expect(snapshot1).toBe(snapshot2);
+   974→  });
+   975→
+   976→  test('TC-STORE-003: update ببيانات مختلفة يُنشئ لقطة جديدة', () => {
+   977→    const snapshot1 = syncUIStore.getSnapshot();
+   978→
+   979→    syncUIStore.update({ isSyncing: true, globalStatus: 'SYNCING' });
+   980→
+   981→    const snapshot2 = syncUIStore.getSnapshot();
+   982→
+   983→    // مرجع مختلف — كائن جديد
+   984→    expect(snapshot1).not.toBe(snapshot2);
+   985→    expect(snapshot2.isSyncing).toBe(true);
+   986→    expect(snapshot2.globalStatus).toBe('SYNCING');
+   987→  });
+   988→
+   989→  test('TC-STORE-004: getServerSnapshot يُعيد الحالة الابتدائية دائماً', () => {
+   990→    // حتى بعد تحديث الحالة
+   991→    syncUIStore.update({ globalStatus: 'COMPLETED', isSyncing: false });
+   992→
+   993→    const serverSnapshot = syncUIStore.getServerSnapshot();
+   994→
+   995→    // الـ SSR دائماً يرى الحالة الابتدائية
+   996→    expect(serverSnapshot.globalStatus).toBe('IDLE');
+   997→    expect(serverSnapshot.isSyncing).toBe(false);
+   998→    expect(serverSnapshot.lastSyncTime).toBeNull();
+   999→  });
+  1000→
+  1001→  test('TC-STORE-005: reset يُعيد المخزن إلى الحالة الابتدائية', () => {
+  1002→    syncUIStore.update({
+  1003→      isSyncing: true,
+  1004→      globalStatus: 'SYNCING',
+  1005→      summary: { succeeded: 5, bypassed: 2, conflicts: 1, failed: 0 },
+  1006→    });
+  1007→
+  1008→    syncUIStore.reset();
+  1009→
+  1010→    const snapshot = syncUIStore.getSnapshot();
+  1011→    expect(snapshot.globalStatus).toBe('IDLE');
+  1012→    expect(snapshot.isSyncing).toBe(false);
+  1013→    expect(snapshot.summary.succeeded).toBe(0);
+  1014→    expect(snapshot.lastSyncTime).toBeNull();
+  1015→  });
+  1016→
+  1017→  test('TC-STORE-006: subscribe يُشعر المستمعين بالتغييرات فقط', () => {
+  1018→    const listener = vi.fn();
+  1019→    const unsubscribe = syncUIStore.subscribe(listener);
+  1020→
+  1021→    // تحديث بنفس البيانات — لا إشعار
+  1022→    syncUIStore.update({ globalStatus: 'IDLE' });
+  1023→    expect(listener).not.toHaveBeenCalled();
+  1024→
+  1025→    // تحديث ببيانات مختلفة — إشعار
+  1026→    syncUIStore.update({ globalStatus: 'SYNCING' });
+  1027→    expect(listener).toHaveBeenCalledTimes(1);
+  1028→
+  1029→    // إلغاء الاشتراك
+  1030→    unsubscribe();
+  1031→
+  1032→    // بعد الإلغاء — لا إشعار
+  1033→    syncUIStore.update({ globalStatus: 'COMPLETED' });
+  1034→    expect(listener).toHaveBeenCalledTimes(1);
+  1035→  });
+  1036→
+  1037→  test('TC-STORE-007: تحديث summary يُنشئ لقطة جديدة (مقارنة عميقة)', () => {
+  1038→    const snapshot1 = syncUIStore.getSnapshot();
+  1039→
+  1040→    // تحديث الكائن الفرعي summary
+  1041→    syncUIStore.update({
+  1042→      summary: { succeeded: 1, bypassed: 0, conflicts: 0, failed: 0 },
+  1043→    });
+  1044→
+  1045→    const snapshot2 = syncUIStore.getSnapshot();
+  1046→
+  1047→    // مرجع مختلف بسبب تغيير summary
+  1048→    expect(snapshot1).not.toBe(snapshot2);
+  1049→    expect(snapshot2.summary.succeeded).toBe(1);
+  1050→  });
+  1051→});
+  1052→
