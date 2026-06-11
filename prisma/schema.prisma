@@ -1,32 +1,335 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// ═══════════════════════════════════════════════════════════════════════
+// 🏛️ المخطط النهائي لقاعدة البيانات — Prisma Schema Finalization
+// منصة المدقق الديناميكي الموحد V3.0
+// PostgreSQL — Optimistic Concurrency Control — Idempotency — Audit Trail
+// ═══════════════════════════════════════════════════════════════════════
+//
+// استراتيجيات الفهرسة وحل النزاعات:
+// ──────────────────────────────────
+// ١. الفهارس المركبة (Composite Indexes):
+//    - [projectId, version] → تسريع فلترة السيناريوهات حسب المشروع والإصدار
+//    - [createdAt, contextId] → تسريع الاستخراج الزمني لسجل التدقيق
+//    - [scenarioId, testCaseId] → تسريع البحث في سجلات RTM
+//
+// ٢. التحكم المتزامن المتفائل (Optimistic Concurrency Control):
+//    - حقل version في Scenario يزداد تلقائياً عند كل تحديث
+//    - ConflictResolver يفحص الـ version قبل تطبيق التعديلات الميدانية
+//    - إذا كان إصدار الخادم أحدث → رفض التعديل المحلي (REJECT_LOCAL)
+//
+// ٣. منع التكرار الخادومي (Idempotency Guard):
+//    - payloadHash كـ @unique يمنع معالجة نفس الحمولة مرتين
+//    - eventId كـ @unique يمنع تكرار نفس الحدث الميداني
+//    - processingExpiresAt يحمي من الاستعصاء (Deadlock Protection)
+//
+// ٤. حوكمة خط الأساس (Baseline Governance):
+//    - isBaselineLocked في Project يمنع تعديل السيناريوهات عند القفل
+//    - baselineVersion يحدد إصدار الكود الحسابي المعتمد
+//
+// ⚠️ ملاحظات لفريق التشغيل (DevOps):
+// ──────────────────────────────────
+// بيئة التطوير:  prisma migrate dev --name init
+//   - يُنشئ ملف migration جديد
+//   - يُطبّق التغييرات على قاعدة البيانات المحلية
+//   - يُعيد توليد Prisma Client تلقائياً
+//
+// بيئة الإنتاج:  prisma migrate deploy
+//   - يُطبّق migrations المعلقة فقط (بدون إنشاء جديدة)
+//   - لا يُعيد توليد Client (يجب تشغيل prisma generate مسبقاً)
+//   - آمن للبيانات الحية — لا يحذف بيانات
+//   - يجب تشغيله كجزء من pipeline النشر (CI/CD)
+//
+// ⚠️ الفارق الحاسم:
+//   prisma migrate dev  → للتطوير فقط (قد يُعيد تعيين البيانات)
+//   prisma migrate deploy → للإنتاج فقط (يحترم البيانات الحية)
+// ═══════════════════════════════════════════════════════════════════════
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+// ═══════════════════════════════════════════════════════════════════════
+// 📐 التعدادات (Enums) — حالات تشغيلية مقفلة على مستوى قاعدة البيانات
+// ═══════════════════════════════════════════════════════════════════════
+
+/// حالات معالجة الأحداث الميدانية — صمام الأمان ومنع التكرار
+enum EventStatus {
+  PROCESSING   // قيد المعالجة — محجوز بواسطة عامل خادومي
+  SUCCESS      // مُعالج بنجاح — الاستجابة مخزنة في responsePayload
+  FAILED       // فشل نهائي — تجاوز الحد الأقصى للمحاولات
+  RETRYABLE    // فشل مؤقت — قابل لإعادة المحاولة
 }
 
-model Post {
-  id        String   @id @default(cuid())
-  title     String
-  content   String?
-  published Boolean  @default(false)
-  authorId  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+/// حالات نتائج التحقق الهيكلي — المؤشر الحاكم لسلامة المنشأة
+enum StructuralStatus {
+  SUCCESS            // المقطع آمن إنشائياً
+  PUNCHING_FAILURE   // فشل القص الثاقب — خطر إنشائي
+  CRITICAL_ERROR     // خطأ حرج في الحساب
+}
+
+/// حالات سجلات تتبع المتطلبات (RTM)
+enum RtmStatus {
+  PASSED   // المتطلب محقق
+  FAILED   // المتطلب غير محقق — عيب هيكلي
+}
+
+/// حالات طابور المزامنة الخادومي
+enum SyncQueueStatus {
+  PENDING    // في الانتظار — لم يُعالج بعد
+  SYNCING    // قيد المزامنة — محجوز للمعالجة
+  COMPLETED  // مكتمل — تمت المزامنة بنجاح
+  FAILED     // فشل — يحتاج مراجعة يدوية
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// 🛡️ 1. جدول سجلات المعالجة ومنع التكرار (ProcessedEvent)
+// ═══════════════════════════════════════════════════════════════════════
+// يضمن عدم معالجة نفس الحمولة أو نفس الحدث مرتين،
+// ويدعم كاش الاستجابة للـ Idempotency Bypass.
+
+model ProcessedEvent {
+  /// المعرف الأساسي — UUID لتجنب التضارب بين الميدان والخادم
+  id                  String      @id @default(uuid())
+
+  /// البصمة الرقمية للحمولة (SHA-256) — قيد فريد لمنع التكرار المطلق
+  payloadHash         String      @unique
+
+  /// معرف الحدث الميداني — قيد فريد لمنع إعادة معالجة نفس الحدث
+  eventId             String      @unique
+
+  /// رمز الحجز المؤقت — يُستخدم للتحقق من ملكية القفل النشط
+  processingToken     String?
+
+  /// الحالة التشغيلية — enum مقفل يضمن سلامة البيانات
+  status              EventStatus @default(PROCESSING)
+
+  /// عدد محاولات المعالجة — يزداد عند كل فشل
+  attemptCount        Int         @default(1)
+
+  /// رسالة الخطأ الأخيرة — فارغة عند النجاح
+  lastError           String?
+
+  /// كاش الاستجابة الناجحة — يُعيد الاستجابة مباشرة عند التكرار (BYPASS)
+  responsePayload     Json?
+
+  /// صمام الأمان الزمني — يُلغي القفل تلقائياً بعد انتهاء الصلاحية
+  /// يحمي من الاستعصاء (Deadlock) إذا تعطل العامل أثناء المعالجة
+  processingExpiresAt DateTime?
+
+  /// لحظة الإنشاء
+  createdAt           DateTime    @default(now())
+
+  /// لحظة آخر تحديث
+  updatedAt           DateTime    @updatedAt
+
+  /// فهرس أداء على الحالة — يُسرّع استعلامات المراقبة
+  @@index([status])
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// 🏗️ 2. جدول مشاريع التدقيق الإنشائي (Project)
+// ═══════════════════════════════════════════════════════════════════════
+// الكيان الأعلى في التسلسل الهرمي — يربط جميع السيناريوهات وسجلات RTM.
+// يدعم حوكمة قفل خط الأساس (Baseline Lock) لمنع تعديل الثوابت المرجعية.
+
+model Project {
+  /// المعرف الموحد — يُستقبل من الميدان (لا يُولَّد تلقائياً)
+  id                String     @id
+
+  /// اسم المشروع — 3 أحرف على الأقل
+  name              String
+
+  /// وصف المشروع — اختياري
+  description       String?
+
+  /// هل خط الأساس مقفل حوكمياً؟
+  /// عند القفل: لا يمكن تعديل السيناريوهات الميدانية
+  isBaselineLocked  Boolean    @default(false)
+
+  /// إصدار خط الأساس المعتمد — يحدد الكود الحسابي المرجعي
+  /// مثال: "V3.0-Locked", "SYRIAN-CODE-2024"
+  baselineVersion   String     @default("V3.0-Locked")
+
+  /// لحظة الإنشاء
+  createdAt         DateTime   @default(now())
+
+  /// لحظة آخر تحديث
+  updatedAt         DateTime   @updatedAt
+
+  /// السيناريوهات المرتبطة — علاقة One-to-Many
+  scenarios         Scenario[]
+
+  /// فهرس على إصدار خط الأساس — لتسريع فلترة المشاريع المقفلة
+  @@index([baselineVersion])
+  /// فهرس زمني — لتسريع ترتيب المشاريع بالأحدث
+  @@index([createdAt])
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// 📐 3. جدول السيناريوهات الحسابية والنتائج (Scenario)
+// ═══════════════════════════════════════════════════════════════════════
+// كل سيناريو يمثل حالة تصميم واحدة مع مدخلات ومخرجات المحرك الإنشائي.
+// يدعم التحكم المتزامن المتفائل (OCC) عبر حقل version التصاعدي.
+
+model Scenario {
+  /// المعرف الموحد — يُستقبل من الميدان
+  id                String           @id
+
+  /// المشروع الأب — ربط خارجي
+  projectId         String
+
+  /// عنوان السيناريو
+  title             String
+
+  /// المدخلات الهندسية — كائن JSON مرن يحتوي على:
+  ///   f_c, f_y, h_slab, b_column, h_column, a_tributary,
+  ///   bombType, standoffDistance, designMethod, إلخ.
+  inputs            Json
+
+  /// المخرجات الحسابية — كائن JSON مرن يحتوي على:
+  ///   status, d_eff, b_0, eccentricity, e_limit, svgColor,
+  ///   rho_final, v_actual, v_cd, errorMessage
+  /// اختياري حتى يتم تشغيل المحرك الإنشائي
+  outputs           Json?
+
+  /// حالة النتيجة الإنشائية — enum مقفل
+  /// يُستخدم للفلترة السريعة والتنبيهات الحوكمية
+  resultStatus      StructuralStatus?
+
+  /// عداد الإصدار الرقمي التصاعدي — أساس التحكم المتزامن المتفائل (OCC)
+  /// يزداد تلقائياً عند كل تحديث ناجح
+  /// إذا كان إصدار الخادم أحدث من المحلي → رفض التعديل (REJECT_LOCAL)
+  version           Int              @default(1)
+
+  /// لحظة الإنشاء
+  createdAt         DateTime         @default(now())
+
+  /// لحظة آخر تحديث
+  updatedAt         DateTime         @updatedAt
+
+  /// المشروع الأب — علاقة Foreign Key
+  project           Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  /// سجلات RTM المرتبطة — علاقة One-to-Many
+  rtmRecords        RtmRecord[]
+
+  /// فهرس مركب على المشروع والإصدار — يُسرّع عمليات المطابقة الهندسية
+  /// الاستعلام: "أوجد جميع السيناريوهات في المشروع X ذات الإصدار الأحدث"
+  @@index([projectId, version])
+  /// فهرس زمني — لتسريع ترتيب السيناريوهات بالأحدث
+  @@index([createdAt])
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// 📑 4. جدول تتبع المتطلبات (RtmRecord)
+// ═══════════════════════════════════════════════════════════════════════
+// المرجع الحاكم لربط كل اختبار بالمتطلب الهندسي المقابل.
+// يُسجّل حالات النجاح والفشل مع تفاصيل العيوب الهيكلية.
+
+model RtmRecord {
+  /// المعرف الموحد — يُستقبل من الميدان
+  id                    String      @id
+
+  /// السيناريو الأب — ربط خارجي
+  scenarioId            String
+
+  /// معرف حالة الاختبار — مثال: TC-BLAST-001, TC-STRUCT-003
+  testCaseId            String
+
+  /// رمز المتطلب المرتبط — مثال: FR-3.2.9, UFC-2.4.1
+  associatedRequirement String
+
+  /// حالة الاختبار — enum مقفل
+  status                RtmStatus
+
+  /// سجل العيوب — تفاصيل الفشب إنشائياً عند status = FAILED
+  defectLog             String?
+
+  /// لحظة التسجيل
+  timestamp             DateTime    @default(now())
+
+  /// السيناريو الأب — علاقة Foreign Key
+  scenario              Scenario    @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+
+  /// فهرس مركب على السيناريو وحالة الاختبار — لتسريع تقارير التغطية
+  @@index([scenarioId, testCaseId])
+  /// فهرس على الحالة — لتسريع فلترة السجلات الفاشلة
+  @@index([status])
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// 📡 5. جدول سجل التدقيق التاريخي (AuditLog)
+// ═══════════════════════════════════════════════════════════════════════
+// تسجيل شامل لجميع الحركات الميدانية والخادومية.
+// يضمن الشفافية الحوكمية وإمكانية المراجعة الجنائية.
+
+model AuditLog {
+  /// المعرف الأساسي — UUID
+  id              String   @id @default(uuid())
+
+  /// معرف الحدث الميداني (نمط EVT) — يربط بـ ProcessedEvent
+  eventId         String
+
+  /// معرف السياق التنفيذي (نمط CTX) — يربط سلسلة العمليات المترابطة
+  contextId       String
+
+  /// نوع الإجراء — CREATE_PROJECT, UPDATE_SCENARIO, LOG_RTM, إلخ.
+  action          String
+
+  /// من نفّذ الإجراء — معرف المستخدم أو النظام
+  performedBy     String
+
+  /// بيانات إضافية — كائن JSON مرن يحتوي على تفاصيل الحدث
+  metadata        Json?
+
+  /// لحظة التسجيل
+  createdAt       DateTime @default(now())
+
+  /// فهرس مركب تصاعدي على التوقيت والمعرف السياقي
+  /// يضمن استخراج التسلسل الزمني للحركات الميدانية فوراً
+  /// دون إجهاد النواة حتى لو تضخم السجل التشغيلي
+  @@index([createdAt, contextId])
+  /// فهرس على المنفذ — لتسريع تقارير نشاط المستخدمين
+  @@index([performedBy])
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// 🔐 6. جدول المستخدمين والأدوار (User)
+// ═══════════════════════════════════════════════════════════════════════
+// إدارة هويات المهندسين والمراقبين مع أدوار حوكمية.
+
+model User {
+  /// المعرف الأساسي — UUID
+  id                String   @id @default(uuid())
+
+  /// البريد الإلكتروني المؤسسي — فريد
+  email             String   @unique
+
+  /// الاسم الكامل
+  displayName       String
+
+  /// كلمة المرور المشفرة — bcrypt hash
+  passwordHash      String
+
+  /// الدور الحوكمي — ADMIN, ENGINEER, VIEWER
+  role              String   @default("ENGINEER")
+
+  /// رقم النقابة الهندسية — مطلوب للمهندسين
+  syndicateId       String?  @unique
+
+  /// التخصص الهندسي
+  specialization    String?
+
+  /// لحظة الإنشاء
+  createdAt         DateTime @default(now())
+
+  /// لحظة آخر تحديث
+  updatedAt         DateTime @updatedAt
+
+  /// فهرس على الدور — لتسريع فلترة المستخدمين حسب الصلاحيات
+  @@index([role])
 }
