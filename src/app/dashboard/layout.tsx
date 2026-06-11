@@ -5,6 +5,7 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 import React from 'react';
+import Link from 'next/link';
 import { NetworkStatus } from '@/components/network-status';
 import { PWARegister } from '@/components/pwa-register';
 
@@ -40,15 +41,24 @@ export default function DashboardLayout({
             className="flex flex-col gap-1.5 text-sm"
             aria-label="روابط المنصة"
           >
-            <div className="text-slate-200 px-3 py-2 bg-slate-900/60 rounded border-r-2 border-emerald-500 font-semibold cursor-default">
+            <Link
+              href="/dashboard"
+              className="text-slate-200 px-3 py-2 bg-slate-900/60 rounded border-r-2 border-emerald-500 font-semibold hover:bg-slate-800 transition-colors"
+            >
               المشاريع وحالات التدقيق
-            </div>
-            <div className="text-slate-500 px-3 py-2 hover:text-slate-300 transition-colors cursor-pointer">
-              مصفوفة المتطلبات RTM
-            </div>
-            <div className="text-slate-500 px-3 py-2 hover:text-slate-300 transition-colors cursor-pointer">
+            </Link>
+            <Link
+              href="/dashboard/rtm"
+              className="text-slate-500 px-3 py-2 hover:text-slate-300 hover:bg-slate-900/40 transition-colors rounded"
+            >
+              🛡️ مصفوفة المتطلبات RTM
+            </Link>
+            <Link
+              href="/dashboard"
+              className="text-slate-500 px-3 py-2 hover:text-slate-300 hover:bg-slate-900/40 transition-colors rounded"
+            >
               سجلات التدقيق والمطابقة
-            </div>
+            </Link>
           </nav>
         </div>
 
