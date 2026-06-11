@@ -2,6 +2,7 @@
 // مزود حالة التخزين والمزامنة - StorageProvider.tsx
 // منصة المدقق الديناميكي الموحد V3.0
 // تهيئة Dexie + SyncProcessor + مراقبة الشبكة عند تحميل التطبيق
+// يدعم Serwist (@serwist/next) كإطار عمل PWA
 // ═══════════════════════════════════════════════════════════════════════
 
 'use client';
@@ -84,13 +85,26 @@ export function StorageProvider({ children }: { children: ReactNode }) {
         await db.open();
         console.log('[STORAGE] ✅ Dexie/IndexedDB جاهز');
 
-        // ─── تسجيل Service Worker للـ PWA ───
+        // ─── تسجيل Service Worker عبر Serwist ───
         if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
           try {
+            // Serwist يولّد sw.js تلقائياً عبر @serwist/next plugin
             const registration = await navigator.serviceWorker.register('/sw.js', {
               scope: '/',
             });
-            console.log('[STORAGE] ✅ Service Worker مسجل:', registration.scope);
+            console.log('[STORAGE] ✅ Serwist Service Worker مسجل:', registration.scope);
+
+            // مراقبة تحديثات الـ Service Worker
+            registration.addEventListener('updatefound', () => {
+              const newWorker = registration.installing;
+              if (newWorker) {
+                newWorker.addEventListener('statechange', () => {
+                  if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    console.log('[STORAGE] 🔄 تحديث Service Worker جديد متوفر');
+                  }
+                });
+              }
+            });
           } catch (error) {
             console.warn('[STORAGE] ⚠️ فشل تسجيل Service Worker:', error);
           }

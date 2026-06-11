@@ -1,10 +1,11 @@
 // ═══════════════════════════════════════════════════════════════════════
-// إعدادات Next.js - next.config.ts
+// إعدادات Next.js مع Serwist PWA - next.config.ts
 // منصة المدقق الديناميكي الموحد V3.0
-// Service Worker يدوي (sw.js) — لا يعتمد على next-pwa
+// @serwist/next: الخليفة الحديث والمستقر لـ Workbox في بيئة App Router
 // ═══════════════════════════════════════════════════════════════════════
 
 import type { NextConfig } from "next";
+import withSerwist from "@serwist/next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
@@ -16,4 +17,11 @@ const nextConfig: NextConfig = {
   turbopack: {},
 };
 
-export default nextConfig;
+export default withSerwist({
+  swSrc: "src/sw.ts",
+  swDest: "public/sw.js",
+  cacheOnNavigation: true,
+  reloadOnOnline: true,
+  // تعطيل Serwist في وضع التطوير لتجنب تعارض Turbopack
+  disable: process.env.NODE_ENV === "development",
+})(nextConfig);

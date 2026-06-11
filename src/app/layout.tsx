@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════════
 // Layout الرئيسي - منصة المدقق الديناميكي الموحد V3.0
 // PWA Shell + RTL Arabic + Offline-First Architecture
+// Serwist Service Worker Integration
 // ═══════════════════════════════════════════════════════════════════════
 
 import type { Metadata, Viewport } from "next";
@@ -24,7 +25,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: "#1e40af",
+  themeColor: "#0f172a",
 };
 
 export const metadata: Metadata = {
@@ -56,7 +57,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "المدقق الإنشائي",
+    title: "المدقق الديناميكي",
   },
   openGraph: {
     title: "منصة المدقق الديناميكي الموحد V3.0",
@@ -74,7 +75,6 @@ export default function RootLayout({
   return (
     <html lang="ar" dir="rtl" suppressHydrationWarning>
       <head>
-        {/* تسجيل Service Worker للـ PWA */}
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="mobile-web-app-capable" content="yes" />

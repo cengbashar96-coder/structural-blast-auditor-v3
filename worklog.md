@@ -105,3 +105,44 @@ Stage Summary:
 - PWA: Manifest + Service Worker + أيقونات + RTL Arabic
 - الاختبارات: 53/53 PASS (8 هيكلية + 27 تخزين + 18 مزامنة)
 - البناء: next build ناجح (Turbopack + standalone)
+---
+Task ID: 5
+Agent: Main Agent (Super Z)
+Task: تأسيس PWA Shell المتقدم (Serwist + Manifest + Offline Fallback) وبناء واجهات Dashboard التفاعلية (Server-First + Client Islands)
+
+Work Log:
+- تثبيت @serwist/next (9.5.11) + @serwist/precaching + @serwist/strategies + @serwist/routing + @serwist/cacheable-response + @serwist/expiration
+- تحديث public/manifest.json — وثيقة الهوية الرقمية الجديدة (id: /?source=pwa, theme_color: #0f172a, maskable icons, engineering categories)
+- إنشاء src/app/manifest.ts — المولد الحركي للمانيفست المتوافق مع Next.js App Router (MetadataRoute.Manifest)
+- إنشاء src/app/offline/page.tsx — واجهة الهبوط الاحتياطية مع مراقبة حالة الشبكة وزر إعادة الاتصال
+- إنشاء src/components/pwa-register.tsx — مكون مراقبة الـ SW وتنبيه التحديثات الحوكمية (SKIP_WAITING + statechange)
+- إنشاء src/components/network-status.tsx — جزيرة مراقب الشبكة والمزامنة المستقلة (مراقبة Dexie كل 2.5 ثانية + navigator.onLine)
+- إنشاء src/components/engineering-form.tsx — استمارة الإدخال مع RHF + Zod Resolver + حقول قراءة فقط للمخرجات الآلية
+- إنشاء src/components/results-panel.tsx — بطاقة مطابقة الـ Benchmarks مع جدول حوكمة ورسائل خطأ مفصلة
+- إنشاء src/components/eccentricity-svg.tsx — محاكي النواة اللامركزية مع Accessibility معزز (aria-label, sr-only, role=figure)
+- إنشاء src/app/dashboard/layout.tsx — الغلاف الحاكم (Server Component) مع Sidebar ثابت + NetworkStatus + PWARegister
+- إنشاء src/app/dashboard/page.tsx — الصفحة الرئيسية مع خط بيانات كامل: Blast Engine → Engineering Form → Results → SVG
+- إنشاء src/sw.ts — Serwist Service Worker مع 3 استراتيجيات كاش:
+  * CacheFirst: App Shell (خطوط، JS، CSS، أيقونات) — سنة واحدة
+  * StaleWhileRevalidate: البيانات المرجعية (JSON) — 30 يوماً
+  * NetworkFirst: طلبات API — 24 ساعة مع مهلة 10 ثوانٍ
+  * NavigationRoute: Fallback لصفحة /offline
+- تحديث next.config.ts — دمج withSerwist() لتوليد sw.js تلقائياً
+- تحديث src/app/layout.tsx — theme_color: #0f172a + PWA metadata محدث
+- تحديث src/lib/storage/StorageProvider.tsx — دعم Serwist Service Worker registration
+- تحديث vitest.config.ts — إضافة path alias (@/ → ./src/)
+- إنشاء __tests__/pwa-ui.test.ts — 16 اختبار جديد:
+  * TC-PWA-001 إلى 005: PWA Shell (manifest, standalone, RTL, caching strategies, SKIP_WAITING)
+  * TC-UI-001 إلى 008: Dashboard UI (Zod validation, SVG colors, read-only fields, Server-First architecture)
+  * TC-INT-001 إلى 003: تكامل خط البيانات (input→engine→SVG→save, sync monitoring, accessibility)
+- تشغيل جميع الاختبارات: 69/69 PASS
+- البناء: next build ناجح (Turbopack + Serwist) — جميع الصفحات تُولّد (/dashboard, /offline, /manifest.webmanifest)
+
+Stage Summary:
+- الملفات المنتجة: 10 ملفات جديدة (PWA Shell + Dashboard UI) + تحديث 5 ملفات
+- البنية: Server-First Layout + Interactive Client Islands (5 جزر تفاعلية معزولة)
+- PWA: Serwist (@serwist/next) بديل Workbox — 3 استراتيجيات كاش معزولة
+- خط البيانات: Form → Zod → Engine → SVG + Benchmarks → Repository → IndexedDB
+- Accessibility: SVG مع aria-label + sr-only + role=figure لقارئات الشاشة
+- الاختبارات: 69/69 PASS (8 هيكلية + 27 تخزين + 18 مزامنة + 16 PWA/UI)
+- الأداء: Initial Load سريع عبر Static Shell + Code Splitting للجزر التفاعلية
