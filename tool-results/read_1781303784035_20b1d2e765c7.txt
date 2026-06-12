@@ -1,0 +1,866 @@
+     1→// ═══════════════════════════════════════════════════════════════════════
+     2→// صفحة تفاصيل أحمال الانفجار — الخطوة 5
+     3→// منصة المدقق الديناميكي الموحد V3.0
+     4→// مساران مستقلان: السقف (Roof) والجدار (Wall)
+     5→// مرجع القياس: BMK-02 (MK83 + MEDIUM_SOIL)
+     6→// ═══════════════════════════════════════════════════════════════════════
+     7→
+     8→'use client';
+     9→
+    10→import React, { useState, useMemo, useCallback } from 'react';
+    11→import { STEP5_ROOF, STEP5_WALL, STEP6_ROOF, STEP6_WALL } from '@/lib/constants/reference-data';
+    12→import type { BlastLoadPath } from '@/types/engine';
+    13→import { calculateBlastLoad, type BlastLoadOutput } from '@/lib/engine/blast-loads';
+    14→import { STEP2_LOOKUPS, STEP2_GEOMETRY, STEP3_PENETRATION, STEP4_LOCKED } from '@/lib/constants/reference-data';
+    15→
+    16→import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+    17→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+    18→import {
+    19→  Table,
+    20→  TableBody,
+    21→  TableCell,
+    22→  TableHead,
+    23→  TableHeader,
+    24→  TableRow,
+    25→} from '@/components/ui/table';
+    26→import { Badge } from '@/components/ui/badge';
+    27→import { Button } from '@/components/ui/button';
+    28→import { Separator } from '@/components/ui/separator';
+    29→import { Progress } from '@/components/ui/progress';
+    30→
+    31→import {
+    32→  Waves,
+    33→  ArrowUpFromLine,
+    34→  ArrowDownFromLine,
+    35→  Activity,
+    36→  Timer,
+    37→  Ruler,
+    38→  ShieldCheck,
+    39→  FlaskConical,
+    40→  CheckCircle2,
+    41→  XCircle,
+    42→  AlertTriangle,
+    43→  Play,
+    44→  RotateCcw,
+    45→  Gauge,
+    46→} from 'lucide-react';
+    47→
+    48→// ═══════════════════════════════════════════════════════════════════════
+    49→// أنواع مساعدة
+    50→// ═══════════════════════════════════════════════════════════════════════
+    51→
+    52→type PathType = 'roof' | 'wall';
+    53→
+    54→interface DeviationInfo {
+    55→  key: string;
+    56→  label: string;
+    57→  symbol: string;
+    58→  computed: number;
+    59→  reference: number;
+    60→  deviationPct: number;
+    61→  status: 'ok' | 'warn' | 'fail';
+    62→}
+    63→
+    64→// ═══════════════════════════════════════════════════════════════════════
+    65→// دوال مساعدة
+    66→// ═══════════════════════════════════════════════════════════════════════
+    67→
+    68→function fmt(val: number, decimals: number = 4): string {
+    69→  if (!isFinite(val)) return '∞';
+    70→  return val.toFixed(decimals);
+    71→}
+    72→
+    73→function fmtShort(val: number): string {
+    74→  if (!isFinite(val)) return '∞';
+    75→  if (Math.abs(val) >= 1000) return val.toFixed(2);
+    76→  if (Math.abs(val) >= 100) return val.toFixed(3);
+    77→  if (Math.abs(val) >= 1) return val.toFixed(4);
+    78→  return val.toFixed(6);
+    79→}
+    80→
+    81→function calcDeviation(computed: number, reference: number): number {
+    82→  if (reference === 0) return computed === 0 ? 0 : Infinity;
+    83→  return Math.abs(computed - reference) / Math.abs(reference) * 100;
+    84→}
+    85→
+    86→function getDeviationStatus(deviationPct: number): 'ok' | 'warn' | 'fail' {
+    87→  if (deviationPct < 1) return 'ok';
+    88→  if (deviationPct < 5) return 'warn';
+    89→  return 'fail';
+    90→}
+    91→
+    92→function getDeviationColor(status: 'ok' | 'warn' | 'fail'): string {
+    93→  switch (status) {
+    94→    case 'ok': return 'text-emerald-400';
+    95→    case 'warn': return 'text-amber-400';
+    96→    case 'fail': return 'text-red-400';
+    97→  }
+    98→}
+    99→
+   100→function getDeviationBg(status: 'ok' | 'warn' | 'fail'): string {
+   101→  switch (status) {
+   102→    case 'ok': return 'bg-emerald-500/10 border-emerald-500/20';
+   103→    case 'warn': return 'bg-amber-500/10 border-amber-500/20';
+   104→    case 'fail': return 'bg-red-500/10 border-red-500/20';
+   105→  }
+   106→}
+   107→
+   108→function getDeviationIcon(status: 'ok' | 'warn' | 'fail') {
+   109→  switch (status) {
+   110→    case 'ok': return <CheckCircle2 className="size-3.5 text-emerald-400" />;
+   111→    case 'warn': return <AlertTriangle className="size-3.5 text-amber-400" />;
+   112→    case 'fail': return <XCircle className="size-3.5 text-red-400" />;
+   113→  }
+   114→}
+   115→
+   116→// ═══════════════════════════════════════════════════════════════════════
+   117→// مكون النتيجة الرئيسية الكبيرة
+   118→// ═══════════════════════════════════════════════════════════════════════
+   119→
+   120→function KeyResultCard({
+   121→  label,
+   122→  symbol,
+   123→  value,
+   124→  unit,
+   125→  referenceValue,
+   126→  accentColor,
+   127→  icon: Icon,
+   128→}: {
+   129→  label: string;
+   130→  symbol: string;
+   131→  value: number;
+   132→  unit: string;
+   133→  referenceValue: number;
+   134→  accentColor: string;
+   135→  icon: React.ElementType;
+   136→}) {
+   137→  const dev = calcDeviation(value, referenceValue);
+   138→  const status = getDeviationStatus(dev);
+   139→
+   140→  return (
+   141→    <Card className={`bg-slate-900 border-slate-800 relative overflow-hidden`}>
+   142→      {/* شريط اللون العلوي */}
+   143→      <div className={`absolute top-0 right-0 left-0 h-1 ${accentColor}`} />
+   144→      <CardContent className="p-4 pt-5">
+   145→        <div className="flex items-start justify-between gap-2">
+   146→          <div className="flex-1 min-w-0">
+   147→            <div className="flex items-center gap-1.5 mb-2">
+   148→              <Icon className={`size-4 ${status === 'ok' ? 'text-slate-400' : getDeviationColor(status)}`} />
+   149→              <span className="text-xs text-slate-400 truncate">{label}</span>
+   150→            </div>
+   151→            <div className="flex items-baseline gap-1.5">
+   152→              <span className="text-2xl font-bold text-slate-100 font-mono tracking-tight">
+   153→                {fmtShort(value)}
+   154→              </span>
+   155→              <span className="text-xs text-slate-500">{unit}</span>
+   156→            </div>
+   157→            <div className="flex items-center gap-1 mt-2">
+   158→              <span className="text-[10px] text-slate-500 font-mono">{symbol}</span>
+   159→              <Separator orientation="vertical" className="h-2.5 bg-slate-800" />
+   160→              <span className="text-[10px] text-slate-600">مرجع: {fmtShort(referenceValue)}</span>
+   161→            </div>
+   162→          </div>
+   163→          <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono border ${getDeviationBg(status)}`}>
+   164→            {getDeviationIcon(status)}
+   165→            <span className={getDeviationColor(status)}>{dev < 0.01 ? '<0.01' : dev.toFixed(2)}%</span>
+   166→          </div>
+   167→        </div>
+   168→      </CardContent>
+   169→    </Card>
+   170→  );
+   171→}
+   172→
+   173→// ═══════════════════════════════════════════════════════════════════════
+   174→// مكون جدول المعاملات
+   175→// ═══════════════════════════════════════════════════════════════════════
+   176→
+   177→function ParameterTable({
+   178→  title,
+   179→  icon: Icon,
+   180→  accentColor,
+   181→  rows,
+   182→}: {
+   183→  title: string;
+   184→  icon: React.ElementType;
+   185→  accentColor: string;
+   186→  rows: Array<{
+   187→    label: string;
+   188→    symbol: string;
+   189→    value: string | React.ReactNode;
+   190→    unit: string;
+   191→  }>;
+   192→}) {
+   193→  return (
+   194→    <Card className="bg-slate-900 border-slate-800">
+   195→      <CardHeader className="pb-3">
+   196→        <CardTitle className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+   197→          <div className={`p-1.5 rounded-md ${accentColor}`}>
+   198→            <Icon className="size-4 text-slate-200" />
+   199→          </div>
+   200→          {title}
+   201→        </CardTitle>
+   202→      </CardHeader>
+   203→      <CardContent className="px-4 pb-4">
+   204→        <Table>
+   205→          <TableHeader>
+   206→            <TableRow className="border-slate-800 hover:bg-transparent">
+   207→              <TableHead className="text-slate-400 text-xs h-8">المعامل</TableHead>
+   208→              <TableHead className="text-slate-400 text-xs h-8 text-center">الرمز</TableHead>
+   209→              <TableHead className="text-slate-400 text-xs h-8 text-center">القيمة</TableHead>
+   210→              <TableHead className="text-slate-400 text-xs h-8 text-left">الوحدة</TableHead>
+   211→            </TableRow>
+   212→          </TableHeader>
+   213→          <TableBody>
+   214→            {rows.map((row, i) => (
+   215→              <TableRow key={i} className="border-slate-800/60 hover:bg-slate-800/30">
+   216→                <TableCell className="text-xs text-slate-300 py-2">{row.label}</TableCell>
+   217→                <TableCell className="text-xs text-center py-2">
+   218→                  <span className="font-mono text-slate-400 bg-slate-800/50 px-1.5 py-0.5 rounded">
+   219→                    {row.symbol}
+   220→                  </span>
+   221→                </TableCell>
+   222→                <TableCell className="text-xs text-center py-2 font-mono text-slate-100">
+   223→                  {row.value}
+   224→                </TableCell>
+   225→                <TableCell className="text-xs text-left py-2 text-slate-500">{row.unit}</TableCell>
+   226→              </TableRow>
+   227→            ))}
+   228→          </TableBody>
+   229→        </Table>
+   230→      </CardContent>
+   231→    </Card>
+   232→  );
+   233→}
+   234→
+   235→// ═══════════════════════════════════════════════════════════════════════
+   236→// مكون جدول المعاملات الإنشائية
+   237→// ═══════════════════════════════════════════════════════════════════════
+   238→
+   239→function StructuralCoefficientsCard({
+   240→  data,
+   241→  accentColor,
+   242→}: {
+   243→  data: BlastLoadOutput;
+   244→  accentColor: string;
+   245→}) {
+   246→  const rows = [
+   247→    { label: 'المطاوعة الإنشائية', symbol: 'μ_struct', value: fmt(data.mu_struct, 4) },
+   248→    { label: 'معامل الكفاءة', symbol: 'η', value: fmt(data.eta, 4) },
+   249→    { label: 'مقاومة القص الديناميكية', symbol: 'Rsd', value: fmt(data.Rsd, 2), unit: 'kg/cm²' },
+   250→    { label: 'مقاومة الانحناء', symbol: 'Rbd', value: fmt(data.Rbd, 2), unit: 'kg/cm²' },
+   251→    { label: 'معامل الضغط', symbol: 'Kp', value: fmt(data.Kp, 4) },
+   252→    { label: 'معامل الديناميكية', symbol: 'Kd', value: fmt(data.Kd, 4) },
+   253→    { label: 'معامل psi', symbol: 'kpsi', value: fmt(data.kpsi, 4) },
+   254→  ];
+   255→
+   256→  return (
+   257→    <Card className="bg-slate-900 border-slate-800">
+   258→      <CardHeader className="pb-3">
+   259→        <CardTitle className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+   260→          <div className={`p-1.5 rounded-md ${accentColor}`}>
+   261→            <ShieldCheck className="size-4 text-slate-200" />
+   262→          </div>
+   263→          المعاملات الإنشائية
+   264→        </CardTitle>
+   265→      </CardHeader>
+   266→      <CardContent className="px-4 pb-4">
+   267→        <Table>
+   268→          <TableHeader>
+   269→            <TableRow className="border-slate-800 hover:bg-transparent">
+   270→              <TableHead className="text-slate-400 text-xs h-8">المعامل</TableHead>
+   271→              <TableHead className="text-slate-400 text-xs h-8 text-center">الرمز</TableHead>
+   272→              <TableHead className="text-slate-400 text-xs h-8 text-center">القيمة</TableHead>
+   273→            </TableRow>
+   274→          </TableHeader>
+   275→          <TableBody>
+   276→            {rows.map((row, i) => (
+   277→              <TableRow key={i} className="border-slate-800/60 hover:bg-slate-800/30">
+   278→                <TableCell className="text-xs text-slate-300 py-2">{row.label}</TableCell>
+   279→                <TableCell className="text-xs text-center py-2">
+   280→                  <span className="font-mono text-slate-400 bg-slate-800/50 px-1.5 py-0.5 rounded">
+   281→                    {row.symbol}
+   282→                  </span>
+   283→                </TableCell>
+   284→                <TableCell className="text-xs text-center py-2 font-mono text-slate-100">
+   285→                  {row.value}
+   286→                  {row.unit && <span className="text-slate-500 mr-1 text-[10px]">{row.unit}</span>}
+   287→                </TableCell>
+   288→              </TableRow>
+   289→            ))}
+   290→          </TableBody>
+   291→        </Table>
+   292→      </CardContent>
+   293→    </Card>
+   294→  );
+   295→}
+   296→
+   297→// ═══════════════════════════════════════════════════════════════════════
+   298→// مكون مقارنة BMK-02
+   299→// ═══════════════════════════════════════════════════════════════════════
+   300→
+   301→function BMK02ComparisonCard({
+   302→  computed,
+   303→  reference,
+   304→  path,
+   305→  accentColor,
+   306→}: {
+   307→  computed: BlastLoadOutput;
+   308→  reference: Omit<BlastLoadOutput, 'path'>;
+   309→  path: PathType;
+   310→  accentColor: string;
+   311→}) {
+   312→  const deviations: DeviationInfo[] = useMemo(() => {
+   313→    const keys: Array<{ key: keyof BlastLoadOutput; label: string; symbol: string }> = [
+   314→      { key: 'Pmax', label: 'الضغط الأقصى', symbol: 'Pmax' },
+   315→      { key: 'P_ekv', label: 'الضغط المكافئ', symbol: 'P_ekv' },
+   316→      { key: 'Pp', label: 'ضغط التصميم', symbol: 'Pp' },
+   317→      { key: 'omega', label: 'التردد الدائري', symbol: 'ω' },
+   318→      { key: 'tau', label: 'زمن الطور الموجب', symbol: 'τ' },
+   319→      { key: 'tau_ef', label: 'الزمن الفعال', symbol: 'τ_ef' },
+   320→      { key: 'tau_n', label: 'الزمن الطبيعي', symbol: 'τ_n' },
+   321→      { key: 'C_dyn', label: 'السرعة الديناميكية', symbol: 'C_dyn' },
+   322→      { key: 'R_ekv', label: 'البعد المكافئ', symbol: 'R_ekv' },
+   323→      { key: 'R_star', label: 'البعد النجمي', symbol: 'R*' },
+   324→      { key: 'mu_struct', label: 'المطاوعة الإنشائية', symbol: 'μ_struct' },
+   325→      { key: 'eta', label: 'معامل الكفاءة', symbol: 'η' },
+   326→      { key: 'Kp', label: 'معامل الضغط', symbol: 'Kp' },
+   327→      { key: 'Kd', label: 'معامل الديناميكية', symbol: 'Kd' },
+   328→      { key: 'kpsi', label: 'معامل psi', symbol: 'kpsi' },
+   329→    ];
+   330→
+   331→    return keys.map(({ key, label, symbol }) => {
+   332→      const computedVal = computed[key] as number;
+   333→      const refVal = reference[key as keyof Omit<BlastLoadOutput, 'path'>] as number;
+   334→      const dev = calcDeviation(computedVal, refVal);
+   335→      const status = getDeviationStatus(dev);
+   336→      return { key: key as string, label, symbol, computed: computedVal, reference: refVal, deviationPct: dev, status };
+   337→    });
+   338→  }, [computed, reference]);
+   339→
+   340→  const okCount = deviations.filter(d => d.status === 'ok').length;
+   341→  const warnCount = deviations.filter(d => d.status === 'warn').length;
+   342→  const failCount = deviations.filter(d => d.status === 'fail').length;
+   343→  const totalScore = Math.round((okCount / deviations.length) * 100);
+   344→
+   345→  return (
+   346→    <Card className="bg-slate-900 border-slate-800">
+   347→      <CardHeader className="pb-3">
+   348→        <div className="flex items-center justify-between">
+   349→          <CardTitle className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+   350→            <div className={`p-1.5 rounded-md ${accentColor}`}>
+   351→              <FlaskConical className="size-4 text-slate-200" />
+   352→            </div>
+   353→            مقارنة مرجعية — BMK-02
+   354→          </CardTitle>
+   355→          <div className="flex items-center gap-2">
+   356→            <Badge variant="outline" className="text-[10px] border-emerald-600/40 text-emerald-400 bg-emerald-500/10">
+   357→              {okCount} مطابق
+   358→            </Badge>
+   359→            {warnCount > 0 && (
+   360→              <Badge variant="outline" className="text-[10px] border-amber-600/40 text-amber-400 bg-amber-500/10">
+   361→                {warnCount} تحذير
+   362→              </Badge>
+   363→            )}
+   364→            {failCount > 0 && (
+   365→              <Badge variant="outline" className="text-[10px] border-red-600/40 text-red-400 bg-red-500/10">
+   366→                {failCount} انحراف
+   367→              </Badge>
+   368→            )}
+   369→          </div>
+   370→        </div>
+   371→        <div className="mt-2 space-y-1.5">
+   372→          <div className="flex items-center justify-between text-[10px] text-slate-400">
+   373→            <span>نسبة المطابقة</span>
+   374→            <span className={totalScore >= 80 ? 'text-emerald-400' : totalScore >= 50 ? 'text-amber-400' : 'text-red-400'}>
+   375→              {totalScore}%
+   376→            </span>
+   377→          </div>
+   378→          <Progress value={totalScore} className="h-1.5" />
+   379→        </div>
+   380→      </CardHeader>
+   381→      <CardContent className="px-4 pb-4">
+   382→        <div className="max-h-72 overflow-y-auto custom-scrollbar">
+   383→          <Table>
+   384→            <TableHeader>
+   385→              <TableRow className="border-slate-800 hover:bg-transparent">
+   386→                <TableHead className="text-slate-400 text-xs h-8">المعامل</TableHead>
+   387→                <TableHead className="text-slate-400 text-xs h-8 text-center">الرمز</TableHead>
+   388→                <TableHead className="text-slate-400 text-xs h-8 text-center">المحسوب</TableHead>
+   389→                <TableHead className="text-slate-400 text-xs h-8 text-center">المرجع</TableHead>
+   390→                <TableHead className="text-slate-400 text-xs h-8 text-center">الانحراف</TableHead>
+   391→                <TableHead className="text-slate-400 text-xs h-8 text-center">الحالة</TableHead>
+   392→              </TableRow>
+   393→            </TableHeader>
+   394→            <TableBody>
+   395→              {deviations.map((d, i) => (
+   396→                <TableRow key={i} className="border-slate-800/60 hover:bg-slate-800/30">
+   397→                  <TableCell className="text-xs text-slate-300 py-1.5">{d.label}</TableCell>
+   398→                  <TableCell className="text-xs text-center py-1.5">
+   399→                    <span className="font-mono text-slate-400 bg-slate-800/50 px-1.5 py-0.5 rounded">
+   400→                      {d.symbol}
+   401→                    </span>
+   402→                  </TableCell>
+   403→                  <TableCell className="text-xs text-center py-1.5 font-mono text-slate-200">
+   404→                    {fmtShort(d.computed)}
+   405→                  </TableCell>
+   406→                  <TableCell className="text-xs text-center py-1.5 font-mono text-slate-400">
+   407→                    {fmtShort(d.reference)}
+   408→                  </TableCell>
+   409→                  <TableCell className="text-xs text-center py-1.5 font-mono">
+   410→                    <span className={getDeviationColor(d.status)}>
+   411→                      {d.deviationPct < 0.01 ? '<0.01' : d.deviationPct.toFixed(2)}%
+   412→                    </span>
+   413→                  </TableCell>
+   414→                  <TableCell className="text-xs text-center py-1.5">
+   415→                    <div className="flex items-center justify-center">
+   416→                      {getDeviationIcon(d.status)}
+   417→                    </div>
+   418→                  </TableCell>
+   419→                </TableRow>
+   420→              ))}
+   421→            </TableBody>
+   422→          </Table>
+   423→        </div>
+   424→      </CardContent>
+   425→    </Card>
+   426→  );
+   427→}
+   428→
+   429→// ═══════════════════════════════════════════════════════════════════════
+   430→// مكون تبويب المسار (سقف/جدار)
+   431→// ═══════════════════════════════════════════════════════════════════════
+   432→
+   433→function PathTabContent({
+   434→  path,
+   435→  data,
+   436→  reference,
+   437→  accentColor,
+   438→  accentBg,
+   439→}: {
+   440→  path: PathType;
+   441→  data: BlastLoadOutput;
+   442→  reference: Omit<BlastLoadOutput, 'path'>;
+   443→  accentColor: string;
+   444→  accentBg: string;
+   445→}) {
+   446→  const timeRows = [
+   447→    { label: 'زمن الطور الموجب', symbol: 'τ', value: fmt(data.tau), unit: 's' },
+   448→    { label: 'الزمن الفعال', symbol: 'τ_ef', value: fmt(data.tau_ef), unit: 's' },
+   449→    { label: 'الزمن الطبيعي', symbol: 'τ_n', value: fmt(data.tau_n), unit: 's' },
+   450→    { label: 'السرعة الديناميكية', symbol: 'C_dyn', value: fmt(data.C_dyn), unit: 'm/s' },
+   451→  ];
+   452→
+   453→  const distanceRows = [
+   454→    { label: 'البعد المكافئ', symbol: 'R_ekv', value: fmt(data.R_ekv), unit: 'm' },
+   455→    { label: 'البعد النجمي', symbol: 'R*', value: fmt(data.R_star), unit: 'm' },
+   456→    { label: 'النسبة المختزلة', symbol: 'h̄', value: fmt(data.h_bar), unit: '—' },
+   457→    { label: 'البعد المختزل B1', symbol: 'R̄_b1', value: fmt(data.R_bar_b1), unit: '—' },
+   458→    {
+   459→      label: 'شرط R_ekv > R*',
+   460→      symbol: '',
+   461→      value: data.R_ekv_gt_R_star ? (
+   462→        <span className="flex items-center justify-center gap-1 text-emerald-400">
+   463→          <CheckCircle2 className="size-3.5" /> ✓
+   464→        </span>
+   465→      ) : (
+   466→        <span className="flex items-center justify-center gap-1 text-red-400">
+   467→          <XCircle className="size-3.5" /> ✗
+   468→        </span>
+   469→      ),
+   470→      unit: '—',
+   471→    },
+   472→  ];
+   473→
+   474→  return (
+   475→    <div className="space-y-6">
+   476→      {/* ─── أ) النتائج الرئيسية — 4 بطاقات كبيرة ─── */}
+   477→      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+   478→        <KeyResultCard
+   479→          label="الضغط الأقصى"
+   480→          symbol="Pmax"
+   481→          value={data.Pmax}
+   482→          unit="kg/cm²"
+   483→          referenceValue={reference.Pmax}
+   484→          accentColor={accentBg}
+   485→          icon={Gauge}
+   486→        />
+   487→        <KeyResultCard
+   488→          label="الضغط المكافئ"
+   489→          symbol="P_ekv"
+   490→          value={data.P_ekv}
+   491→          unit="kg/cm²"
+   492→          referenceValue={reference.P_ekv}
+   493→          accentColor={accentBg}
+   494→          icon={ArrowUpFromLine}
+   495→        />
+   496→        <KeyResultCard
+   497→          label="ضغط التصميم"
+   498→          symbol="Pp"
+   499→          value={data.Pp}
+   500→          unit="kg/cm²"
+   501→          referenceValue={reference.Pp}
+   502→          accentColor={accentBg}
+   503→          icon={ShieldCheck}
+   504→        />
+   505→        <KeyResultCard
+   506→          label="التردد الدائري"
+   507→          symbol="ω"
+   508→          value={data.omega}
+   509→          unit="rad/s"
+   510→          referenceValue={reference.omega}
+   511→          accentColor={accentBg}
+   512→          icon={Activity}
+   513→        />
+   514→      </div>
+   515→
+   516→      {/* ─── ب + ج) معاملات الزمن والمسافة ─── */}
+   517→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+   518→        <ParameterTable
+   519→          title="معاملات الزمن"
+   520→          icon={Timer}
+   521→          accentColor={accentBg}
+   522→          rows={timeRows}
+   523→        />
+   524→        <ParameterTable
+   525→          title="معاملات البعد"
+   526→          icon={Ruler}
+   527→          accentColor={accentBg}
+   528→          rows={distanceRows}
+   529→        />
+   530→      </div>
+   531→
+   532→      {/* ─── د) المعاملات الإنشائية ─── */}
+   533→      <StructuralCoefficientsCard data={data} accentColor={accentBg} />
+   534→
+   535→      {/* ─── هـ) مقارنة BMK-02 ─── */}
+   536→      <BMK02ComparisonCard
+   537→        computed={data}
+   538→        reference={reference}
+   539→        path={path}
+   540→        accentColor={accentBg}
+   541→      />
+   542→    </div>
+   543→  );
+   544→}
+   545→
+   546→// ═══════════════════════════════════════════════════════════════════════
+   547→// الصفحة الرئيسية
+   548→// ═══════════════════════════════════════════════════════════════════════
+   549→
+   550→export default function BlastLoadsPage() {
+   551→  const [activeTab, setActiveTab] = useState<PathType>('roof');
+   552→  const [isRunning, setIsRunning] = useState(false);
+   553→  const [hasRun, setHasRun] = useState(false);
+   554→
+   555→  // ─── بيانات السقف والجدار (الافتراضية من المرجع) ───
+   556→  const [roofData, setRoofData] = useState<BlastLoadOutput>(() => ({
+   557→    path: 'roof',
+   558→    h_bar: STEP5_ROOF.h_bar,
+   559→    R_bar_b1: STEP5_ROOF.R_bar_b1,
+   560→    R_ekv: STEP5_ROOF.R_ekv,
+   561→    R_star: STEP5_ROOF.R_star,
+   562→    max_bv: STEP5_ROOF.max_bv,
+   563→    tau: STEP5_ROOF.tau,
+   564→    tau_ef: STEP5_ROOF.tau_ef,
+   565→    tau_n: STEP5_ROOF.tau_n,
+   566→    a0cp: STEP5_ROOF.a0cp,
+   567→    a1cp: STEP5_ROOF.a1cp,
+   568→    omega: STEP5_ROOF.omega,
+   569→    C_dyn: STEP5_ROOF.C_dyn,
+   570→    mu_struct: STEP5_ROOF.mu_struct,
+   571→    eta: STEP5_ROOF.eta,
+   572→    Rsd: STEP5_ROOF.Rsd,
+   573→    Rbd: STEP5_ROOF.Rbd,
+   574→    lambda: STEP5_ROOF.lambda,
+   575→    Kp: STEP5_ROOF.Kp,
+   576→    Pmax: STEP5_ROOF.Pmax,
+   577→    Kd: STEP5_ROOF.Kd,
+   578→    kpsi: STEP5_ROOF.kpsi,
+   579→    P_ekv: STEP5_ROOF.P_ekv,
+   580→    Pct: STEP5_ROOF.Pct,
+   581→    Pp: STEP5_ROOF.Pp,
+   582→    R_ekv_gt_R_star: STEP5_ROOF.R_ekv_gt_R_star,
+   583→  }));
+   584→
+   585→  const [wallData, setWallData] = useState<BlastLoadOutput>(() => ({
+   586→    path: 'wall',
+   587→    h_bar: STEP5_WALL.h_bar,
+   588→    R_bar_b1: STEP5_WALL.R_bar_b1,
+   589→    R_ekv: STEP5_WALL.R_ekv,
+   590→    R_star: STEP5_WALL.R_star,
+   591→    max_bv: STEP5_WALL.max_bv,
+   592→    tau: STEP5_WALL.tau,
+   593→    tau_ef: STEP5_WALL.tau_ef,
+   594→    tau_n: STEP5_WALL.tau_n,
+   595→    a0cp: STEP5_WALL.a0cp,
+   596→    a1cp: STEP5_WALL.a1cp,
+   597→    omega: STEP5_WALL.omega,
+   598→    C_dyn: STEP5_WALL.C_dyn,
+   599→    mu_struct: STEP5_WALL.mu_struct,
+   600→    eta: STEP5_WALL.eta,
+   601→    Rsd: STEP5_WALL.Rsd,
+   602→    Rbd: STEP5_WALL.Rbd,
+   603→    lambda: STEP5_WALL.lambda,
+   604→    Kp: STEP5_WALL.Kp,
+   605→    Pmax: STEP5_WALL.Pmax,
+   606→    Kd: STEP5_WALL.Kd,
+   607→    kpsi: STEP5_WALL.kpsi,
+   608→    P_ekv: STEP5_WALL.P_ekv,
+   609→    Pct: STEP5_WALL.Pct,
+   610→    Pp: STEP5_WALL.Pp,
+   611→    R_ekv_gt_R_star: STEP5_WALL.R_ekv_gt_R_star,
+   612→  }));
+   613→
+   614→  // ─── تشغيل محرك الحمل الانفجاري ───
+   615→  const handleRunEngine = useCallback(async () => {
+   616→    setIsRunning(true);
+   617→    try {
+   618→      // إعداد المدخلات من بيانات الخطوات السابقة
+   619→      const commonInput = {
+   620→        C_ef: STEP3_PENETRATION.C_ef,
+   621→        h_pr: STEP3_PENETRATION.h_pr,
+   622→        R_actual: STEP3_PENETRATION.R_actual,
+   623→        Z: STEP3_PENETRATION.Zp,
+   624→        ap: STEP2_GEOMETRY.ap,
+   625→        bp: STEP2_GEOMETRY.bp,
+   626→        Ea: STEP2_GEOMETRY.Ea,
+   627→        xi: STEP2_GEOMETRY.xi,
+   628→        RbH: STEP2_LOOKUPS.RbH,
+   629→        RsH: STEP2_LOOKUPS.RsH,
+   630→        gamma_b: STEP2_LOOKUPS.gamma_b,
+   631→        gamma_g: STEP2_LOOKUPS.gamma_g,
+   632→      };
+   633→
+   634→      // حساب مسار السقف
+   635→      const roofResult = calculateBlastLoad({
+   636→        ...commonInput,
+   637→        path: 'roof',
+   638→        Hp_cm: STEP4_LOCKED.Hp,
+   639→        Kpod: STEP6_ROOF.Kpod,
+   640→        R_bar_b1: STEP5_ROOF.R_bar_b1,
+   641→        a0z: STEP6_ROOF.a0z,
+   642→        a1z: STEP6_ROOF.a1z,
+   643→        Kp: STEP5_ROOF.Kp,
+   644→        Kd: STEP5_ROOF.Kd,
+   645→      });
+   646→
+   647→      // حساب مسار الجدار
+   648→      const wallResult = calculateBlastLoad({
+   649→        ...commonInput,
+   650→        path: 'wall',
+   651→        Hp_cm: STEP4_LOCKED.Hc,
+   652→        Kpod: STEP6_WALL.Kpod,
+   653→        R_bar_b1: STEP5_WALL.R_bar_b1,
+   654→        a0z: STEP6_WALL.a0z,
+   655→        a1z: STEP6_WALL.a1z,
+   656→        Kp: STEP5_WALL.Kp,
+   657→        Kd: STEP5_WALL.Kd,
+   658→      });
+   659→
+   660→      setRoofData(roofResult);
+   661→      setWallData(wallResult);
+   662→      setHasRun(true);
+   663→    } catch (error) {
+   664→      console.error('[BLAST-LOADS-ENGINE] Error:', error);
+   665→    } finally {
+   666→      setIsRunning(false);
+   667→    }
+   668→  }, []);
+   669→
+   670→  // ─── إعادة تعيين إلى القيم المرجعية ───
+   671→  const handleReset = useCallback(() => {
+   672→    setRoofData({
+   673→      path: 'roof',
+   674→      h_bar: STEP5_ROOF.h_bar,
+   675→      R_bar_b1: STEP5_ROOF.R_bar_b1,
+   676→      R_ekv: STEP5_ROOF.R_ekv,
+   677→      R_star: STEP5_ROOF.R_star,
+   678→      max_bv: STEP5_ROOF.max_bv,
+   679→      tau: STEP5_ROOF.tau,
+   680→      tau_ef: STEP5_ROOF.tau_ef,
+   681→      tau_n: STEP5_ROOF.tau_n,
+   682→      a0cp: STEP5_ROOF.a0cp,
+   683→      a1cp: STEP5_ROOF.a1cp,
+   684→      omega: STEP5_ROOF.omega,
+   685→      C_dyn: STEP5_ROOF.C_dyn,
+   686→      mu_struct: STEP5_ROOF.mu_struct,
+   687→      eta: STEP5_ROOF.eta,
+   688→      Rsd: STEP5_ROOF.Rsd,
+   689→      Rbd: STEP5_ROOF.Rbd,
+   690→      lambda: STEP5_ROOF.lambda,
+   691→      Kp: STEP5_ROOF.Kp,
+   692→      Pmax: STEP5_ROOF.Pmax,
+   693→      Kd: STEP5_ROOF.Kd,
+   694→      kpsi: STEP5_ROOF.kpsi,
+   695→      P_ekv: STEP5_ROOF.P_ekv,
+   696→      Pct: STEP5_ROOF.Pct,
+   697→      Pp: STEP5_ROOF.Pp,
+   698→      R_ekv_gt_R_star: STEP5_ROOF.R_ekv_gt_R_star,
+   699→    });
+   700→    setWallData({
+   701→      path: 'wall',
+   702→      h_bar: STEP5_WALL.h_bar,
+   703→      R_bar_b1: STEP5_WALL.R_bar_b1,
+   704→      R_ekv: STEP5_WALL.R_ekv,
+   705→      R_star: STEP5_WALL.R_star,
+   706→      max_bv: STEP5_WALL.max_bv,
+   707→      tau: STEP5_WALL.tau,
+   708→      tau_ef: STEP5_WALL.tau_ef,
+   709→      tau_n: STEP5_WALL.tau_n,
+   710→      a0cp: STEP5_WALL.a0cp,
+   711→      a1cp: STEP5_WALL.a1cp,
+   712→      omega: STEP5_WALL.omega,
+   713→      C_dyn: STEP5_WALL.C_dyn,
+   714→      mu_struct: STEP5_WALL.mu_struct,
+   715→      eta: STEP5_WALL.eta,
+   716→      Rsd: STEP5_WALL.Rsd,
+   717→      Rbd: STEP5_WALL.Rbd,
+   718→      lambda: STEP5_WALL.lambda,
+   719→      Kp: STEP5_WALL.Kp,
+   720→      Pmax: STEP5_WALL.Pmax,
+   721→      Kd: STEP5_WALL.Kd,
+   722→      kpsi: STEP5_WALL.kpsi,
+   723→      P_ekv: STEP5_WALL.P_ekv,
+   724→      Pct: STEP5_WALL.Pct,
+   725→      Pp: STEP5_WALL.Pp,
+   726→      R_ekv_gt_R_star: STEP5_WALL.R_ekv_gt_R_star,
+   727→    });
+   728→    setHasRun(false);
+   729→  }, []);
+   730→
+   731→  return (
+   732→    <div
+   733→      className="space-y-6"
+   734→      dir="rtl"
+   735→      role="region"
+   736→      aria-labelledby="blast-loads-heading"
+   737→    >
+   738→      {/* ─── الرأس ─── */}
+   739→      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-800/60 pb-4">
+   740→        <div>
+   741→          <h1
+   742→            id="blast-loads-heading"
+   743→            className="text-xl font-bold text-slate-100 flex items-center gap-2.5"
+   744→          >
+   745→            <div className="p-2 rounded-lg bg-sky-500/10 border border-sky-500/20">
+   746→              <Waves className="size-5 text-sky-400" />
+   747→            </div>
+   748→            أحمال الانفجار — الخطوة 5
+   749→          </h1>
+   750→          <p className="text-xs text-slate-400 mt-1.5 mr-11">
+   751→            حساب تفصيلي لأحمال الانفجار على مساري السقف والجدار — مرجع القياس BMK-02
+   752→          </p>
+   753→        </div>
+   754→        <div className="flex items-center gap-2">
+   755→          {hasRun && (
+   756→            <Badge variant="outline" className="text-[10px] border-sky-600/40 text-sky-400 bg-sky-500/10">
+   757→              <Activity className="size-3 ml-1" />
+   758→              تم التشغيل
+   759→            </Badge>
+   760→          )}
+   761→          <Button
+   762→            variant="outline"
+   763→            size="sm"
+   764→            onClick={handleReset}
+   765→            className="text-xs border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-slate-100"
+   766→          >
+   767→            <RotateCcw className="size-3.5 ml-1" />
+   768→            إعادة تعيين
+   769→          </Button>
+   770→          <Button
+   771→            size="sm"
+   772→            onClick={handleRunEngine}
+   773→            disabled={isRunning}
+   774→            className="text-xs bg-sky-600 hover:bg-sky-700 text-white"
+   775→          >
+   776→            <Play className="size-3.5 ml-1" />
+   777→            {isRunning ? 'جاري الحساب...' : 'تشغيل المحرك'}
+   778→          </Button>
+   779→        </div>
+   780→      </div>
+   781→
+   782→      {/* ─── ملخص سريع علوي ─── */}
+   783→      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+   784→        <div className="bg-slate-900/80 border border-slate-800 rounded-lg px-3 py-2.5">
+   785→          <div className="text-[10px] text-slate-500 mb-0.5">Pmax السقف</div>
+   786→          <div className="text-sm font-mono font-bold text-sky-400">{fmtShort(roofData.Pmax)} <span className="text-slate-500 font-normal text-[10px]">kg/cm²</span></div>
+   787→        </div>
+   788→        <div className="bg-slate-900/80 border border-slate-800 rounded-lg px-3 py-2.5">
+   789→          <div className="text-[10px] text-slate-500 mb-0.5">Pp السقف</div>
+   790→          <div className="text-sm font-mono font-bold text-sky-300">{fmtShort(roofData.Pp)} <span className="text-slate-500 font-normal text-[10px]">kg/cm²</span></div>
+   791→        </div>
+   792→        <div className="bg-slate-900/80 border border-slate-800 rounded-lg px-3 py-2.5">
+   793→          <div className="text-[10px] text-slate-500 mb-0.5">Pmax الجدار</div>
+   794→          <div className="text-sm font-mono font-bold text-orange-400">{fmtShort(wallData.Pmax)} <span className="text-slate-500 font-normal text-[10px]">kg/cm²</span></div>
+   795→        </div>
+   796→        <div className="bg-slate-900/80 border border-slate-800 rounded-lg px-3 py-2.5">
+   797→          <div className="text-[10px] text-slate-500 mb-0.5">Pp الجدار</div>
+   798→          <div className="text-sm font-mono font-bold text-orange-300">{fmtShort(wallData.Pp)} <span className="text-slate-500 font-normal text-[10px]">kg/cm²</span></div>
+   799→        </div>
+   800→      </div>
+   801→
+   802→      {/* ─── التبويبات: مسار السقف / مسار الجدار ─── */}
+   803→      <Tabs
+   804→        dir="rtl"
+   805→        value={activeTab}
+   806→        onValueChange={(v) => setActiveTab(v as PathType)}
+   807→      >
+   808→        <TabsList className="bg-slate-900 border border-slate-800">
+   809→          <TabsTrigger
+   810→            value="roof"
+   811→            className="data-[state=active]:bg-sky-500/15 data-[state=active]:text-sky-300 text-slate-400 text-xs gap-1.5"
+   812→          >
+   813→            <ArrowUpFromLine className="size-3.5" />
+   814→            مسار السقف
+   815→          </TabsTrigger>
+   816→          <TabsTrigger
+   817→            value="wall"
+   818→            className="data-[state=active]:bg-orange-500/15 data-[state=active]:text-orange-300 text-slate-400 text-xs gap-1.5"
+   819→          >
+   820→            <ArrowDownFromLine className="size-3.5" />
+   821→            مسار الجدار
+   822→          </TabsTrigger>
+   823→        </TabsList>
+   824→
+   825→        {/* ─── تبويب مسار السقف ─── */}
+   826→        <TabsContent value="roof" className="mt-6">
+   827→          <PathTabContent
+   828→            path="roof"
+   829→            data={roofData}
+   830→            reference={STEP5_ROOF}
+   831→            accentColor="text-sky-400"
+   832→            accentBg="bg-sky-500/15"
+   833→          />
+   834→        </TabsContent>
+   835→
+   836→        {/* ─── تبويب مسار الجدار ─── */}
+   837→        <TabsContent value="wall" className="mt-6">
+   838→          <PathTabContent
+   839→            path="wall"
+   840→            data={wallData}
+   841→            reference={STEP5_WALL}
+   842→            accentColor="text-orange-400"
+   843→            accentBg="bg-orange-500/15"
+   844→          />
+   845→        </TabsContent>
+   846→      </Tabs>
+   847→
+   848→      {/* ─── تذييل معلوماتي ─── */}
+   849→      <div className="border-t border-slate-800/60 pt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+   850→        <p className="text-[10px] text-slate-600">
+   851→          مرجع القياس: BMK-02 (MK83 + MEDIUM_SOIL) — القيم المقفلة محمية بقوة الحوكمة
+   852→        </p>
+   853→        <div className="flex items-center gap-3 text-[10px] text-slate-600">
+   854→          <span>STEP5_ROOF: {Object.keys(STEP5_ROOF).length} متغير</span>
+   855→          <Separator orientation="vertical" className="h-2.5 bg-slate-800" />
+   856→          <span>STEP5_WALL: {Object.keys(STEP5_WALL).length} متغير</span>
+   857→          <Separator orientation="vertical" className="h-2.5 bg-slate-800" />
+   858→          <span>STEP6_ROOF: {Object.keys(STEP6_ROOF).length} معامل</span>
+   859→          <Separator orientation="vertical" className="h-2.5 bg-slate-800" />
+   860→          <span>STEP6_WALL: {Object.keys(STEP6_WALL).length} معامل</span>
+   861→        </div>
+   862→      </div>
+   863→    </div>
+   864→  );
+   865→}
+   866→

@@ -1,12 +1,12 @@
 // ═══════════════════════════════════════════════════════════════════════
 // الهيكل الحاكم الثابت من جهة السيرفر - Dashboard Layout
 // منصة المدقق الديناميكي الموحد V3.0
-// Server-First Static Shell + Interactive Client Islands
+// shadcn/ui SidebarProvider + AppSidebar + RTL Arabic + Dark Theme
 // ═══════════════════════════════════════════════════════════════════════
 
-import React from 'react';
-import Link from 'next/link';
-import { NetworkStatus } from '@/components/network-status';
+import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
+import { Separator } from '@/components/ui/separator';
+import { AppSidebar } from '@/components/app-sidebar';
 import { PWARegister } from '@/components/pwa-register';
 
 export const metadata = {
@@ -21,64 +21,24 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div
-      className="flex min-h-screen bg-slate-950 text-slate-100 font-sans antialiased"
-      dir="rtl"
-    >
-      {/* Sidebar الثابت - السيرفر رندر */}
-      <aside
-        className="w-64 border-l border-slate-900 bg-slate-900/40 p-5 hidden md:flex flex-col justify-between"
-        aria-label="الملاحة الرئيسية"
-      >
-        <div className="flex flex-col gap-6">
-          <div className="text-emerald-400 font-bold text-lg tracking-wider border-b border-slate-900 pb-3">
-            المدقق الديناميكي{' '}
-            <span className="text-xs bg-slate-900 text-slate-400 px-1.5 py-0.5 rounded font-mono">
-              V3.0
-            </span>
-          </div>
-          <nav
-            className="flex flex-col gap-1.5 text-sm"
-            aria-label="روابط المنصة"
-          >
-            <Link
-              href="/dashboard"
-              className="text-slate-200 px-3 py-2 bg-slate-900/60 rounded border-r-2 border-emerald-500 font-semibold hover:bg-slate-800 transition-colors"
-            >
-              المشاريع وحالات التدقيق
-            </Link>
-            <Link
-              href="/dashboard/rtm"
-              className="text-slate-500 px-3 py-2 hover:text-slate-300 hover:bg-slate-900/40 transition-colors rounded"
-            >
-              🛡️ مصفوفة المتطلبات RTM
-            </Link>
-            <Link
-              href="/dashboard"
-              className="text-slate-500 px-3 py-2 hover:text-slate-300 hover:bg-slate-900/40 transition-colors rounded"
-            >
-              سجلات التدقيق والمطابقة
-            </Link>
-          </nav>
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset className="bg-slate-950">
+        {/* شريط أدوات علوي مع زر فتح/إغلاق الشريط الجانبي */}
+        <header className="flex h-14 items-center gap-2 border-b border-slate-800/60 px-4">
+          <SidebarTrigger className="text-slate-400 hover:text-slate-200" />
+          <Separator orientation="vertical" className="h-4 bg-slate-800/60" />
+          <span className="text-sm text-slate-500 font-medium">
+            المدقق الديناميكي الموحد
+          </span>
+        </header>
+        {/* منطقة عرض محتوى الصفحات الديناميكية */}
+        <div className="flex-1 p-6 overflow-y-auto">
+          {children}
         </div>
-
-        {/* حقن جزيرة مراقبة الشبكة والمزامنة التفاعلية في الأسفل */}
-        <div className="border-t border-slate-900 pt-4">
-          <NetworkStatus />
-        </div>
-      </aside>
-
-      {/* منطقة عرض محتوى الصفحات الديناميكية */}
-      <main
-        className="flex-1 p-6 overflow-y-auto"
-        id="main-content"
-        role="main"
-      >
-        {children}
-      </main>
-
+      </SidebarInset>
       {/* مدقق ومعالج التحديثات الحوكمي الآمن */}
       <PWARegister />
-    </div>
+    </SidebarProvider>
   );
 }
