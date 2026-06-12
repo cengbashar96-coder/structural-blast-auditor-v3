@@ -62,6 +62,68 @@ export {
   calcDuctilityRatio,
 } from './structural-concrete-core';
 
+// ─── محرك حساب الحمل الانفجاري — الخطوة 5 (سقف + جدار) ───
+export {
+  calculateBlastLoad,
+  calculateBlastLoadBothPaths,
+  calcHBar,
+  calcRekv,
+  calcRStar,
+  calcTauSadovsky,
+  calcEffectiveTimeFactor,
+  calcTauEf,
+  calcTauN,
+  calcOmega,
+  calcCdyn,
+  calcPmaxSadovsky,
+  calcPmaxFromStress,
+  calcKpsi,
+  calcPekv,
+  calcPct,
+  calcPp,
+  calcMuStruct,
+  calcRsd,
+  calcRbd,
+  calcEta,
+  calcLambda as calcBlastLambda,
+} from './blast-loads';
+export type { BlastLoadInput, BlastLoadOutput } from './blast-loads';
+
+// ─── محرك التصميم الإنشائي — الخطوتان 7 و 8 ───
+export {
+  calculateCeilingDesign,
+  calculateWallDesign,
+  calculateFullStructuralDesign,
+  calcPlasticMoment,
+  calcEffectiveDepth as calcStructuralEffectiveDepth,
+  calcAlphaM as calcStructuralAlphaM,
+  calcXiFromAlphaM,
+  calcFinalThickness,
+  calcFloorThickness,
+  calcInnerWallThickness,
+} from './structural';
+export type {
+  CeilingDesignInput,
+  CeilingDesignOutput,
+  WallDesignInput,
+  WallDesignOutput,
+} from './structural';
+
+// ─── محرك تصميم التسليح (الكود السوري 2024 + UFC 3-340-02) ───
+export {
+  calculateRebarDesign,
+  calculateRebarBothPaths,
+  calcRequiredSteelArea,
+  calcRelativeCompressionDepth,
+  calcAlphaM as calcRebarAlphaM,
+  calcReinforcementRatio,
+  calcMinReinforcementRatio,
+  calcMaxReinforcementRatio,
+  calcMaxRelativeDepth,
+  selectOptimalBars,
+} from './rebar';
+export type { RebarDesignInput, RebarDesignOutput } from './rebar';
+
 // ─── محرك المفاضلة بين الأشكال ───
 export {
   compareGeometries,

@@ -1,209 +1,85 @@
 // ═══════════════════════════════════════════════════════════════════════
-// Benchmark 2 — الحالة التصميمية الرئيسية
+// Benchmark 2 — المرجع الذهبي المقفل
 // منصة المدقق الديناميكي الموحد V3.0
-// الحالة الأهم — تربط محرك الانفجار بمحرك التصميم والتسليح
-// ═══════════════════════════════════════════════════════════════════════
-//
-// الهدف: اختبار الحالة التصميمية المتوسطة وربط محرك الانفجار بالتسليح والسماكة
-// السلاح: FAB-500 | السرعة: 350 m/s | التربة: MEDIUM_SOIL | fc=35 | fy=420
-//
-// هذه الحالة تختبر:
-//   - انتقال النظام من الانفجار إلى التصميم الإنشائي: Z, Pr, T0 → ht, As
-//   - ربط محرك الانفجار بمحرك التصميم والتسليح
-//   - المرجع الرئيسي للمقارنة مع Excel
+// السلاح: MK83 | السرعة: 350 m/s | التربة: MEDIUM_SOIL | fc=20 | fy=300
+// جميع القيم مستخرجة من ملفات Excel والمرجع التحليلي
 // ═══════════════════════════════════════════════════════════════════════
 
 import type { BenchmarkCase } from '../types';
 
-/**
- * BMK-02: Design-critical medium case
- *
- * FAB-500 + V = 350 m/s + MEDIUM_SOIL + fc = 35 MPa + fy = 420 MPa
- *
- * هذه هي الحالة التصميمية الحاكمة لأنها:
- * 1. تربط بين الانفجار والتحميل الديناميكي ثم التصميم الإنشائي
- * 2. تختبر المتغيرات الوسيطة الحاكمة: Z, Pr, T0, ht, As
- * 3. تختبر DIF للمواد إذا كان المحرك سيستخدمها فعلياً
- * 4. ستكون المرجع الرئيسي للمقارنة مع Excel
- */
 export const BMK_02: BenchmarkCase = {
   id: 'BMK-02',
-  title: 'Design-critical medium case',
+  title: 'Golden Reference — MK83 + MEDIUM_SOIL (Locked)',
   objective:
-    'اختبار الحالة التصميمية المتوسطة وربط محرك الانفجار بالتصميم الإنشائي. ' +
-    'هذه هي الحالة الأهم لأنها تنتقل من حسابات الضغط (Z, Pr, T0) إلى التصميم (ht, As). ' +
-    'تحتوي على متغيرات وسيطة حاكمة تربط المحركين معاً — أي انحراف هنا يعني خطأ في السلسلة الكاملة.',
+    'المرجع الذهبي المقفل: يختبر خط الحساب الكامل من الاختراق عبر الانفجار حتى التصميم الإنشائي. ' +
+    'كل output يجب أن يُقاس مقابل هذه القيم. ' +
+    'المتغيرات المقفلة لا تُعاد كتابتها بين المحركات.',
 
-  // ─── المدخلات ───
   inputSpec: {
-    weaponId: 'FAB-500',
-    impactVelocity: 350,           // m/s
+    weaponId: 'W_MK83',
+    impactVelocity: 350,
     soilTypeCode: 'MEDIUM_SOIL',
-    impactAngleDeg: 0,             // عمودي
-    ceilingDepthMeters: 3.0,       // عمق نفق متوسط
-    tunnelSpanShortMeters: 6.0,    // بحر قصير
-    tunnelSpanLongMeters: 8.0,     // بحر طويل
-    fcMpa: 35,
-    fyMpa: 420,
+    impactAngleDeg: 20,
+    ceilingDepthMeters: 3.7,
+    tunnelSpanShortMeters: 4,
+    tunnelSpanLongMeters: 5,
+    fcMpa: 20,
+    fyMpa: 300,
   },
 
-  // ─── المرجع ───
   referenceSpec: {
-    weaponName: 'FAB-500',
-    soilNameAr: 'طين مع حجارة (رملية حصوية متوسطة الكثافة)',
+    weaponName: 'MK83',
+    soilNameAr: 'طين مع حجارة (رملية حصوية متوسطة)',
     soilReferenceName: 'clay_with_stones',
     designCode: 'BOTH',
-    excelSource: 'Excel-02: Blast + Structural Design (Primary Reference)',
+    excelSource: 'Excel-BMK02: MK83 + MEDIUM_SOIL Complete Pipeline (Steps 2-8)',
   },
 
-  // ─── القيم الوسيطة المتوقعة (محرك الانفجار) ───
   expectedIntermediateValues: [
-    {
-      symbol: 'lambda1',
-      unit: 'dimensionless',
-      expectedValue: 0,        // TODO: ملء من Excel
-      tolerance: 0.02,
-      description: 'معامل تأثير شكل الرأس (Eq. 14)',
-    },
-    {
-      symbol: 'lambda2',
-      unit: 'dimensionless',
-      expectedValue: 0,        // TODO: ملء من Excel
-      tolerance: 0.02,
-      description: 'معامل تأثير القطر (Eq. 15)',
-    },
-    {
-      symbol: 'n',
-      unit: 'dimensionless',
-      expectedValue: 0,        // TODO: ملء من Excel
-      tolerance: 0.02,
-      description: 'أُس التأثير (Eq. 16)',
-    },
-    {
-      symbol: 'C_eff',
-      unit: 'kg',
-      expectedValue: 0,        // TODO: ملء من Excel
-      tolerance: 0.02,
-      description: 'الشحنة الفعالة (Eq. 19)',
-    },
-    {
-      symbol: 'x1',
-      unit: 'm',
-      expectedValue: 0,        // TODO: ملء من Excel
-      tolerance: 0.02,
-      description: 'عمق الاختراق في التربة المتوسطة',
-    },
-    {
-      symbol: 'h_bar_z',
-      unit: 'dimensionless',
-      expectedValue: 0,        // TODO: ملء من Excel
-      tolerance: 0.02,
-      description: 'العمق المكافئ المختزل',
-    },
-    {
-      symbol: 'Z',
-      unit: 'm/kg^(1/3)',
-      expectedValue: 0,        // TODO: ملء من Excel
-      tolerance: 0.02,
-      description: 'البعد المختزل (Scaled Distance) — الحاكم لقيمة الضغط',
-    },
-    {
-      symbol: 'sigma_max',
-      unit: 'MPa',
-      expectedValue: 0,        // TODO: ملء من Excel
-      tolerance: 0.02,
-      description: 'الإجهاد الأقصى في التربة',
-    },
-    {
-      symbol: 'Pr',
-      unit: 'MPa',
-      expectedValue: 0,        // TODO: ملء من Excel
-      tolerance: 0.02,
-      description: 'الضغط المنعكس (Reflected Pressure)',
-    },
-    {
-      symbol: 'T0',
-      unit: 'ms',
-      expectedValue: 0,        // TODO: ملء من Excel
-      tolerance: 0.02,
-      description: 'مدة الطور الموجب (Positive Phase Duration)',
-    },
-    {
-      symbol: 'DIF_c',
-      unit: 'dimensionless',
-      expectedValue: 1.25,     // ثابت UFC 3-340-02
-      tolerance: 0.001,
-      description: 'معامل تضخيم الخرسانة الديناميكي (UFC Table)',
-    },
-    {
-      symbol: 'DIF_s',
-      unit: 'dimensionless',
-      expectedValue: 1.20,     // ثابت UFC 3-340-02
-      tolerance: 0.001,
-      description: 'معامل تضخيم الحديد الديناميكي (UFC Table)',
-    },
+    { symbol: 'lambda1', unit: '-', expectedValue: 1.134667074552914, tolerance: 0.01, description: 'معامل تأثير شكل الرأس (Eq.14)' },
+    { symbol: 'lambda2', unit: '-', expectedValue: 1.21253869486675, tolerance: 0.01, description: 'معامل تأثير القطر (Eq.15)' },
+    { symbol: 'n_exp', unit: '-', expectedValue: 1.5, tolerance: 0.01, description: 'أُس التأثير (Eq.16)' },
+    { symbol: 'C_ef', unit: 'kg', expectedValue: 334.76575, tolerance: 0.01, description: 'الشحنة الفعالة (Eq.19)' },
+    { symbol: 'h_pr', unit: 'm', expectedValue: 2.7717367373, tolerance: 0.01, description: 'عمق الاختراق المصحح' },
+    { symbol: 'R_actual', unit: 'm', expectedValue: 7.6230969724513375, tolerance: 0.02, description: 'البعد الشعاعي الفعلي' },
+    { symbol: 'Zp', unit: '-', expectedValue: 5.8212740516901125, tolerance: 0.02, description: 'البعد المختزل' },
+    { symbol: 'ht', unit: 'cm', expectedValue: 107.2167056901, tolerance: 0.01, description: 'العمق الكلي' },
+    { symbol: 'Bt', unit: 'm', expectedValue: 8.0520158398, tolerance: 0.01, description: 'البحر المكافئ' },
+    { symbol: 'omega_roof', unit: 'rad/s', expectedValue: 561.6673670487, tolerance: 0.01, description: 'تردد السقف الطبيعي' },
+    { symbol: 'omega_wall', unit: 'rad/s', expectedValue: 1024.0477954056, tolerance: 0.01, description: 'تردد الجدار الطبيعي' },
+    { symbol: 'Pmax_roof', unit: 'kg/cm2', expectedValue: 4.6084144906, tolerance: 0.01, description: 'الضغط الأقصى سقف' },
+    { symbol: 'Pmax_wall', unit: 'kg/cm2', expectedValue: 6.2856466944, tolerance: 0.01, description: 'الضغط الأقصى جدار' },
+    { symbol: 'P_ekv_roof', unit: 'kg/cm2', expectedValue: 3.8157671982, tolerance: 0.01, description: 'الضغط المكافئ سقف' },
+    { symbol: 'P_ekv_wall', unit: 'kg/cm2', expectedValue: 3.0828604505, tolerance: 0.01, description: 'الضغط المكافئ جدار' },
+    { symbol: 'Pp_roof', unit: 'kg/cm2', expectedValue: 4.9211162574, tolerance: 0.01, description: 'الحمل التصميمي سقف' },
+    { symbol: 'Pp_wall', unit: 'kg/cm2', expectedValue: 3.7845046175, tolerance: 0.01, description: 'الحمل التصميمي جدار' },
+    { symbol: 'Mp_roof', unit: 'kg.cm', expectedValue: 20000000, tolerance: 0.01, description: 'عزم السقف' },
+    { symbol: 'Mp_wall', unit: 'kg.cm', expectedValue: 10000000, tolerance: 0.01, description: 'عزم الجدار' },
+    { symbol: 'h0', unit: 'cm', expectedValue: 67.1042712976, tolerance: 0.01, description: 'العمق الفعال من العزم' },
   ],
 
-  // ─── القيم النهائية المتوقعة (محرك التصميم) ───
   expectedFinalValues: [
-    {
-      symbol: 'P_design',
-      unit: 'MPa',
-      expectedValue: 0,        // TODO: ملء من Excel
-      tolerance: 0.02,
-      description: 'الضغط التصميمي الكلي (ساكن + ديناميكي)',
-    },
-    {
-      symbol: 'ht',
-      unit: 'm',
-      expectedValue: 0,        // TODO: ملء من Excel
-      tolerance: 0.02,
-      description: 'السماكة المطلوبة للسقف',
-    },
-    {
-      symbol: 'As',
-      unit: 'cm²/m',
-      expectedValue: 0,        // TODO: ملء من Excel
-      tolerance: 0.02,
-      description: 'مساحة التسليح المطلوبة لكل متر',
-    },
-    {
-      symbol: 'e/h',
-      unit: 'dimensionless',
-      expectedValue: 0,        // TODO: ملء من Excel
-      tolerance: 0.02,
-      description: 'نسبة اللامركزية — يجب أن تكون ≤ 1/6',
-    },
-    {
-      symbol: 'v_actual/v_cd',
-      unit: 'dimensionless',
-      expectedValue: 0,        // TODO: ملء من Excel
-      tolerance: 0.02,
-      description: 'نسبة إجهاد القص الثاقب الفعلي/المسموح',
-    },
+    { symbol: 'Hp_final', unit: 'cm', expectedValue: 70.4594848625, tolerance: 0.01, description: 'سماكة السقف النهائية' },
+    { symbol: 'Hc_final', unit: 'cm', expectedValue: 49.8223795452, tolerance: 0.01, description: 'سماكة الجدار النهائية' },
+    { symbol: 'Hf_final', unit: 'cm', expectedValue: 42.3490226134, tolerance: 0.01, description: 'سماكة الأرضية النهائية' },
+    { symbol: 'Hvct_final', unit: 'cm', expectedValue: 30, tolerance: 0.01, description: 'سماكة الجدار الداخلي' },
   ],
 
-  // ─── القرار المتوقع ───
   expectedFinalDecision: {
     validationStatus: 'SUCCESS',
     expectedFailures: [],
-    expectedWarnings: [
-      'التحقق من شرط الديناميكية — إذا لم يتحقق يجب استخدام معاملات مختلفة',
-      'التحقق من شرط نواة المقطع — اللامركزية يجب ألا تتجاوز h/6',
-    ],
+    expectedWarnings: [],
   },
 
-  // ─── ملاحظات المحرك ───
   engineNotes:
-    'هذه هي الحالة الأهم في النظام بأكمله. ' +
-    'هنا يحدث الانتقال من محرك الانفجار (Blast Engine) إلى محرك التصميم الإنشائي (Design Engine). ' +
-    'المتغيرات الوسيطة Z, Pr, T0 هي الجسر بين المحركين — أي خطأ فيها يُفسد التصميم بالكامل. ' +
-    'DIF للمواد ثابتة (1.25 خرسانة، 1.20 حديد) وفق UFC 3-340-02. ' +
-    'يجب مقارنة ALL values مع Excel-02 مباشرة بعد أول تشغيل للمحرك. ' +
-    'التسامح يجب أن يُضيَّق إلى ≤1% بعد الاعتماد.',
+    'المرجع الذهبي المقفل — BMK-02. ' +
+    'h_pr المصححة = 2.7717367373 m (ليست 3.65 m القديمة). ' +
+    'omega_wall = 1024.0478 rad/s (منفصلة عن omega_roof = 561.6674). ' +
+    'القيم المقفلة لا تُعاد كتابتها بين المحركات — التسامح 5% كحد أقصى. ' +
+    'Hp_final = h0 × 1.05 = 70.46 cm. ' +
+    'لا تعِد الحسابات ما لم تتغير المدخلات الأساسية.',
 
-  // ─── بيانات وصفية ───
   priority: 1,
-  isLocked: false,            // يُقفل بعد ملء القيم المرجعية من Excel
-  lastUpdated: '2026-06-12',
+  isLocked: true,
+  lastUpdated: '2026-06-13',
 };

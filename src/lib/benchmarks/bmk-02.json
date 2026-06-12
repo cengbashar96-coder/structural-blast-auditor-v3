@@ -1,0 +1,278 @@
+{
+  "_meta": {
+    "title": "BMK-02 Golden Reference — MK83 + MEDIUM_SOIL",
+    "version": "3.0",
+    "locked": true,
+    "lastUpdated": "2026-06-13",
+    "source": "Excel Reference + Analytical Verification",
+    "designCodes": ["Syrian Code 2024", "UFC 3-340-02"],
+    "description": "المرجع الذهبي المقفل — كل output يجب أن يُقاس مقابل هذه القيم"
+  },
+
+  "inputSpec": {
+    "weaponId": "W_MK83",
+    "impactVelocity": 350,
+    "soilTypeCode": "MEDIUM_SOIL",
+    "impactAngleDeg": 20,
+    "ceilingDepthMeters": 3.7,
+    "tunnelSpanShortMeters": 4,
+    "tunnelSpanLongMeters": 5,
+    "fcMpa": 20,
+    "fyMpa": 300
+  },
+
+  "referenceSpec": {
+    "weaponName": "MK83",
+    "weaponNameAr": "إم كيه 83",
+    "soilNameAr": "طين مع حجارة (رملية حصوية متوسطة)",
+    "soilReferenceName": "clay_with_stones",
+    "designCode": "BOTH",
+    "excelSource": "Excel-BMK02: MK83 + MEDIUM_SOIL Complete Pipeline"
+  },
+
+  "step2_inputs": {
+    "P": 441,
+    "lo_b": 3.01,
+    "lk": 1.92,
+    "dk": 0.36,
+    "ld_ratio": 5.3,
+    "lhd_ratio": 2,
+    "C": 215,
+    "V": 350,
+    "alpha": 20,
+    "beta": 22,
+    "Z": 3.7
+  },
+
+  "step2_lookups": {
+    "K1": 1.639,
+    "kpr_g": 1.8e-6,
+    "kpr_b": 8e-7,
+    "kpr_bt": 8e-7,
+    "K_kp_ct": 1.1,
+    "m1": 1.65,
+    "RbH": 200,
+    "RsH": 3000,
+    "gamma_b": 2500,
+    "gamma_g": 1700,
+    "Kpod_b": 1.18,
+    "Kpod_s": 1.25,
+    "n0": 1.25,
+    "Kbt_bt": 0.13,
+    "R_bar": 1.1
+  },
+
+  "step2_geometry": {
+    "a_et": 3,
+    "bp": 5,
+    "ap": 4,
+    "Lk": 50,
+    "Bk": 20,
+    "Pk": 492.25,
+    "Hct": 0.5,
+    "Hvct": 0.3,
+    "Hf": 0.45,
+    "Hp": 0.75,
+    "h_obs": 0.5,
+    "psi_p": 0.012,
+    "Ea": 2100000,
+    "xi": 0.55,
+    "rho_pc": 150,
+    "rho_g": 180
+  },
+
+  "step3_penetration": {
+    "lambda1": 1.134667074552914,
+    "lambda2": 1.21253869486675,
+    "n_exp": 1.5,
+    "C_ef": 334.76575,
+    "tsu": 0.8700554755551839,
+    "h_pr": 2.7717367373,
+    "h_z": 1.9016812617,
+    "h_z_bar": 0.2738524483,
+    "R_actual": 7.6230969724513375,
+    "Zp": 5.8212740516901125,
+    "L_tunnel": 120,
+    "Y_diff": 0.9282632627,
+    "hb_destruction": 3.04871409496884,
+    "hb_cracking": 3.603025748599538
+  },
+
+  "step4_locked": {
+    "Hp": 70.4594848625,
+    "Hc": 49.8223795452,
+    "Hf": 42.3490226134,
+    "Hvct": 30,
+    "ht": 107.2167056901,
+    "Bt": 8.0520158398,
+    "Hpc": 3.8320486334,
+    "Pp_roof": 4.9211162574,
+    "Pp_wall": 3.7845046175
+  },
+
+  "step5_roof": {
+    "h_bar": 0.1180386444,
+    "R_bar_b1": 0.35,
+    "R_ekv": 6.1162229173,
+    "R_star": 2.4255308549,
+    "max_bv": 2.8802590566,
+    "tau": 0.2649955477,
+    "tau_ef": 0.2377897178,
+    "tau_n": 0.0364676512,
+    "a0cp": 152.5,
+    "a1cp": 60.8333333333,
+    "omega": 561.6673670487,
+    "C_dyn": 46.8110958109,
+    "mu_struct": 0.8861875,
+    "eta": 1.25,
+    "Rsd": 3937.5,
+    "Rbd": 236,
+    "lambda": 0.124184033,
+    "Kp": 0.8,
+    "Pmax": 4.6084144906,
+    "Kd": 0.92,
+    "kpsi": 0.9,
+    "P_ekv": 3.8157671982,
+    "Pct": 1.1053490592,
+    "Pp": 4.9211162574,
+    "R_ekv_gt_R_star": true
+  },
+
+  "step5_wall": {
+    "tau_theta": 0.5767495645,
+    "Z_wall": 7.5042156903,
+    "h_b": 3.4417407889,
+    "h_bar": 0.4966373747,
+    "R_bar_b1": 0.9,
+    "R_ekv": 7.0437416025,
+    "R_star": 6.2370793411,
+    "max_bv": 3.1428233472,
+    "tau": 0.0684870163,
+    "tau_ef": 0.0608519094,
+    "tau_n": 0.0111111111,
+    "a0cp": 540,
+    "a1cp": 270,
+    "omega": 1024.0477954056,
+    "C_dyn": 72.0811111111,
+    "mu_struct": 0.9123333333,
+    "eta": 1.6666666667,
+    "Rsd": 3937.5,
+    "Rbd": 236,
+    "lambda": 3.1449305556,
+    "Kp": 1,
+    "Pmax": 6.2856466944,
+    "Kd": 1,
+    "kpsi": 0.85,
+    "P_ekv": 3.0828604505,
+    "Pct": 0.701644167,
+    "Pp": 3.7845046175,
+    "R_ekv_gt_R_star": true
+  },
+
+  "step6_roof": {
+    "R_bar_b1": 0.35,
+    "mu_table": 0.025,
+    "eta_table": 0.015,
+    "Kt": 1,
+    "a0z": 180,
+    "a1z": 80,
+    "Kpod": 1.25,
+    "Kp": 0.8,
+    "Kd": 0.92
+  },
+
+  "step6_wall": {
+    "R_bar_b1": 0.9,
+    "mu_table": 0.009,
+    "eta_table": 0.001,
+    "Kt": 1.1,
+    "a0z": 580,
+    "a1z": 290,
+    "Kpod": 1.18,
+    "Kp": 1,
+    "Kd": 1
+  },
+
+  "step7_ceiling": {
+    "Mp": 20000000,
+    "mu_struct": 0.8861875,
+    "Rsd": 3937.5,
+    "h0": 67.1042712976,
+    "Hp_final": 70.4594848625
+  },
+
+  "step8_wall": {
+    "Mp": 10000000,
+    "Hc_final": 49.8223795452,
+    "Hf_final": 42.3490226134,
+    "Hvct_final": 30
+  },
+
+  "final_locked": {
+    "Hp_final": 70.4594848625,
+    "Hc_final": 49.8223795452,
+    "Hf_final": 42.3490226134,
+    "Hvct_final": 30,
+    "Pp_roof": 4.9211162574,
+    "Pp_wall": 3.7845046175,
+    "Pmax_roof": 4.6084144906,
+    "Pmax_wall": 6.2856466944,
+    "P_ekv_roof": 3.8157671982,
+    "P_ekv_wall": 3.0828604505,
+    "ht": 107.2167056901,
+    "Bt": 8.0520158398,
+    "Hpc": 3.8320486334,
+    "h_pr": 2.7717367373,
+    "omega_roof": 561.6673670487,
+    "omega_wall": 1024.0477954056,
+    "tau_ef_roof": 0.2377897178,
+    "tau_ef_wall": 0.0608519094,
+    "Mp_roof": 20000000,
+    "Mp_wall": 10000000,
+    "C_ef": 334.76575,
+    "R_actual": 7.6230969724513375,
+    "Zp": 5.8212740516901125,
+    "lambda1": 1.134667074552914,
+    "lambda2": 1.21253869486675
+  },
+
+  "expectedIntermediateValues": [
+    { "symbol": "lambda1", "unit": "-", "expectedValue": 1.134667074552914, "tolerance": 0.01, "description": "معامل تأثير شكل الرأس (Eq.14)" },
+    { "symbol": "lambda2", "unit": "-", "expectedValue": 1.21253869486675, "tolerance": 0.01, "description": "معامل تأثير القطر (Eq.15)" },
+    { "symbol": "n_exp", "unit": "-", "expectedValue": 1.5, "tolerance": 0.01, "description": "أُس التأثير (Eq.16)" },
+    { "symbol": "C_ef", "unit": "kg", "expectedValue": 334.76575, "tolerance": 0.01, "description": "الشحنة الفعالة (Eq.19)" },
+    { "symbol": "h_pr", "unit": "m", "expectedValue": 2.7717367373, "tolerance": 0.01, "description": "عمق الاختراق المصحح" },
+    { "symbol": "R_actual", "unit": "m", "expectedValue": 7.6230969724513375, "tolerance": 0.02, "description": "البعد الشعاعي الفعلي" },
+    { "symbol": "Zp", "unit": "-", "expectedValue": 5.8212740516901125, "tolerance": 0.02, "description": "البعد المختزل" },
+    { "symbol": "ht", "unit": "cm", "expectedValue": 107.2167056901, "tolerance": 0.01, "description": "العمق الكلي" },
+    { "symbol": "Bt", "unit": "m", "expectedValue": 8.0520158398, "tolerance": 0.01, "description": "البحر المكافئ" },
+    { "symbol": "R_ekv_roof", "unit": "m", "expectedValue": 6.1162229173, "tolerance": 0.01, "description": "البعد المكافئ سقف" },
+    { "symbol": "R_ekv_wall", "unit": "m", "expectedValue": 7.0437416025, "tolerance": 0.01, "description": "البعد المكافئ جدار" },
+    { "symbol": "tau_roof", "unit": "s", "expectedValue": 0.2649955477, "tolerance": 0.01, "description": "زمن الطور الموجب سقف" },
+    { "symbol": "tau_wall", "unit": "s", "expectedValue": 0.0684870163, "tolerance": 0.01, "description": "زمن الطور الموجب جدار" },
+    { "symbol": "omega_roof", "unit": "rad/s", "expectedValue": 561.6673670487, "tolerance": 0.01, "description": "تردد السقف الطبيعي" },
+    { "symbol": "omega_wall", "unit": "rad/s", "expectedValue": 1024.0477954056, "tolerance": 0.01, "description": "تردد الجدار الطبيعي" },
+    { "symbol": "Pmax_roof", "unit": "kg/cm2", "expectedValue": 4.6084144906, "tolerance": 0.01, "description": "الضغط الأقصى سقف" },
+    { "symbol": "Pmax_wall", "unit": "kg/cm2", "expectedValue": 6.2856466944, "tolerance": 0.01, "description": "الضغط الأقصى جدار" },
+    { "symbol": "P_ekv_roof", "unit": "kg/cm2", "expectedValue": 3.8157671982, "tolerance": 0.01, "description": "الضغط المكافئ سقف" },
+    { "symbol": "P_ekv_wall", "unit": "kg/cm2", "expectedValue": 3.0828604505, "tolerance": 0.01, "description": "الضغط المكافئ جدار" },
+    { "symbol": "Pp_roof", "unit": "kg/cm2", "expectedValue": 4.9211162574, "tolerance": 0.01, "description": "الحمل التصميمي سقف" },
+    { "symbol": "Pp_wall", "unit": "kg/cm2", "expectedValue": 3.7845046175, "tolerance": 0.01, "description": "الحمل التصميمي جدار" },
+    { "symbol": "Mp_roof", "unit": "kg.cm", "expectedValue": 20000000, "tolerance": 0.01, "description": "عزم السقف" },
+    { "symbol": "Mp_wall", "unit": "kg.cm", "expectedValue": 10000000, "tolerance": 0.01, "description": "عزم الجدار" },
+    { "symbol": "h0", "unit": "cm", "expectedValue": 67.1042712976, "tolerance": 0.01, "description": "العمق الفعال من العزم" }
+  ],
+
+  "expectedFinalValues": [
+    { "symbol": "Hp_final", "unit": "cm", "expectedValue": 70.4594848625, "tolerance": 0.01, "description": "سماكة السقف النهائية" },
+    { "symbol": "Hc_final", "unit": "cm", "expectedValue": 49.8223795452, "tolerance": 0.01, "description": "سماكة الجدار النهائية" },
+    { "symbol": "Hf_final", "unit": "cm", "expectedValue": 42.3490226134, "tolerance": 0.01, "description": "سماكة الأرضية النهائية" },
+    { "symbol": "Hvct_final", "unit": "cm", "expectedValue": 30, "tolerance": 0.01, "description": "سماكة الجدار الداخلي" }
+  ],
+
+  "expectedFinalDecision": {
+    "validationStatus": "SUCCESS",
+    "expectedFailures": [],
+    "expectedWarnings": []
+  }
+}
