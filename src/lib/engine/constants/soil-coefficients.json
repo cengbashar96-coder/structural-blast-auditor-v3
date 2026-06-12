@@ -1,0 +1,68 @@
+[
+  {
+    "code": "SOFT_SOIL",
+    "nameAr": "طين رخو مشبع بالماء",
+    "referenceName": "water_saturated_clay",
+    "kp": 0.000013,
+    "kv": 0.6,
+    "densityKgM3": 1700,
+    "destroyCoeff": 0.85,
+    "crackCoeff": 0.6,
+    "oppositeCrackCoeff": null
+  },
+  {
+    "code": "MEDIUM_SOIL",
+    "nameAr": "طين متوسط الكثافة",
+    "referenceName": "clay_with_stones",
+    "kp": 0.000007,
+    "kv": 0.5,
+    "densityKgM3": 1800,
+    "destroyCoeff": 0.6,
+    "crackCoeff": 0.5,
+    "oppositeCrackCoeff": null
+  },
+  {
+    "code": "REINFORCED_SAND",
+    "nameAr": "طبقة رمل مخلوطة بالشوائب",
+    "referenceName": "sand_with_impurities",
+    "kp": 0.000005,
+    "kv": 0.5,
+    "densityKgM3": 1900,
+    "destroyCoeff": 0.6,
+    "crackCoeff": 0.5,
+    "oppositeCrackCoeff": null
+  },
+  {
+    "code": "HARD_ROCK",
+    "nameAr": "غرانيت أو غنيس",
+    "referenceName": "granite_gneiss",
+    "kp": 0.0000007,
+    "kv": 0.2,
+    "densityKgM3": 2650,
+    "destroyCoeff": 0.53,
+    "crackCoeff": 0.75,
+    "oppositeCrackCoeff": 0.75
+  },
+  {
+    "code": "CONCRETE",
+    "nameAr": "بيتون عادي مقاومة 225 كغ/سم²",
+    "referenceName": "plain_concrete_225",
+    "kp": 0.000001,
+    "kv": 0.16,
+    "densityKgM3": 2500,
+    "destroyCoeff": 0.34,
+    "crackCoeff": 0.48,
+    "oppositeCrackCoeff": 0.48
+  },
+  {
+    "code": "REINFORCED_CONCRETE",
+    "nameAr": "بيتون مسلح مقاومة 250-300 كغ/سم²",
+    "referenceName": "rc_concrete_250_300",
+    "kp": 0.0000007,
+    "kv": 0.13,
+    "densityKgM3": 2500,
+    "destroyCoeff": 0.3,
+    "crackCoeff": 0.44,
+    "oppositeCrackCoeff": 0.44
+  }
+]

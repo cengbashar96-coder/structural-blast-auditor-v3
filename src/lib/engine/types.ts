@@ -18,7 +18,13 @@ export type GeometryType = 'RECTANGULAR' | 'CIRCULAR' | 'ARCHED';
  * HARD_ROCK       → granite_gneiss (جرانيت/نايس) — Kpr=7.00e-7
  * REINFORCED_SAND → sand_with_impurities (رمل مشوب) — Kpr=5.00e-6
  */
-export type SoilTypeCode = 'SOFT_SOIL' | 'MEDIUM_SOIL' | 'HARD_ROCK' | 'REINFORCED_SAND';
+export type SoilTypeCode =
+  | 'SOFT_SOIL'
+  | 'MEDIUM_SOIL'
+  | 'HARD_ROCK'
+  | 'REINFORCED_SAND'
+  | 'CONCRETE'
+  | 'REINFORCED_CONCRETE';
 
 /** طريقة التصميم الإنشائي */
 export type DesignMethod = 'SYRIAN_WSD_2024' | 'USD_GLOBAL';
@@ -97,10 +103,12 @@ export interface SoilCoefficients {
   kv: number;
   /** الكثافة kg/m³ */
   densityKgM3: number;
-  /** معامل تدمير التربة (اختياري — للاختراق العميق) */
+  /** معامل تدمير التربة Kp (من جداول الاستيفاء I-1) */
   destructionCoeff?: number;
-  /** معامل تشقق التربة (اختياري — لفحص spalling) */
+  /** معامل تشقق التربة Kot (من جداول الاستيفاء I-1) — null يعني غير مطبّق */
   crackingCoeff?: number;
+  /** معامل التشقق المعاكس Kot (للتربة التي لها سلوك مختلف بالاتجاه المعاكس) */
+  oppositeCrackCoeff?: number | null;
 }
 
 // ─── 4. مدخلات ومخرجات الاختراق (Penetration I/O) ──────────────────
@@ -375,6 +383,8 @@ export const SOIL_CODE_TO_REFERENCE_NAME: Record<SoilTypeCode, string> = {
   MEDIUM_SOIL: 'clay_with_stones',
   HARD_ROCK: 'granite_gneiss',
   REINFORCED_SAND: 'sand_with_impurities',
+  CONCRETE: 'plain_concrete_225',
+  REINFORCED_CONCRETE: 'rc_concrete_250_300',
 } as const;
 
 /**
@@ -385,4 +395,6 @@ export const SOIL_CODE_TO_AR: Record<SoilTypeCode, string> = {
   MEDIUM_SOIL: 'طين مع حجارة (رملية حصوية متوسطة)',
   HARD_ROCK: 'جرانيت/نايس (صخرية شديدة القساوة)',
   REINFORCED_SAND: 'رمل مشوب (رملية محسّنة)',
+  CONCRETE: 'بيتون عادي 225 كغ/سم²',
+  REINFORCED_CONCRETE: 'بيتون مسلح 250-300 كغ/سم²',
 } as const;

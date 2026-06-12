@@ -252,3 +252,61 @@ Stage Summary:
 - مكتبة الأسلحة: 17 سلاح (14 أمريكية + 3 روسية FAB) موحدة في WeaponData
 - التعيينات: SoilTypeCode ↔ SOIL_TABLE.name مُثبَّتة ولا يمكن تعديلها بدون مراجعة
 - القيم المرجعية: TODO — تُملأ من Excel بعد كتابة penetration-core
+---
+Task ID: 8
+Agent: Main Agent (Super Z)
+Task: بناء النواة الحسابية الكاملة — الثوابت + 4 محركات + مُحققات + منسّق
+
+Work Log:
+- إنشاء src/lib/engine/constants/weapons-library.json — 17 سلاح (14 أمريكية + 3 روسية FAB) بقيم صحيحة من baselineConstants
+- إنشاء src/lib/engine/constants/soil-coefficients.json — 6 أنواع تربة/صخر/بيتون مع kp, kv, density, Kot
+- إنشاء src/lib/engine/constants/blast-coefficients.ts — EXPLOSIVE_COEFFICIENTS (6 متفجرات + TNT), STRESS_COEFFICIENTS (4 ترب), SOIL_WAVE_PARAMETERS (4 ترب), CONCRETE_RESISTANCE_TABLE, STEEL_TABLE, UFC_340_02, SYRIAN_CODE_2024, SOIL_TO_STRESS_MAP, SOIL_TO_WAVE_MAP
+- إنشاء src/lib/engine/constants/index.ts — محمّل الثوابت: weaponJsonToWeaponData, soilJsonToSoilCoefficients, دوال بحث (getWeaponById, getSoilByCode, getExplosiveK1, getStressCoeffForSoil, getSoilWaveForSoil)
+- تحديث src/lib/engine/types.ts — توسيع SoilTypeCode (+CONCRETE, +REINFORCED_CONCRETE), إضافة oppositeCrackCoeff لـ SoilCoefficients, تحديث SOIL_CODE_TO_REFERENCE_NAME و SOIL_CODE_TO_AR
+- إنشاء src/lib/engine/penetration-core.ts — المعادلات المرجعية (Eq. 13-19):
+  * calcLambda1 (Eq. 14): λ₁ = 0.5 + 0.4 × (Lh/D)^(2/3)
+  * calcLambda2 (Eq. 15): λ₂ = 2.8 × d^(1/3) − 1.3 × d^(1/2)
+  * calcN (Eq. 16): n = 3.5 − Lh/D
+  * calcCEffective (Eq. 19): C_eff = 0.95 × K₁ × C
+  * calcTsuPenetrating (Eq. 17): τ = 0.5 × lₖ × cos((α + nα)/2)
+  * calcTsuExplosive (Eq. 18): τ = 0.5 × dₖ
+  * calcPenetrationDepth (Eq. 13): x₁ = λ₁ × λ₂ × Kpr × (P/d²) × V × cos(α)
+  * calculatePenetration: المحرك الرئيسي + تحذيرات ذكية
+- إنشاء src/lib/engine/blast-pressure-core.ts — المعادلات المرجعية (Eq. 1-12):
+  * calcSadovskyOverpressure (Eq. 1): ΔP = 0.1∛C/R + 0.43∛C²/R² + 1.4C/R³
+  * calcPositivePhaseTime (Eq. 4): τ⁺ = 1.7×10⁻³∛√C×√R
+  * calcImpulse (Eq. 5): I = 6.3∛C²/R
+  * calcEffectiveTime (Eq. 8): τ_eff = τ⁺ × f(ΔPmax)
+  * calculateBlastPressure: المحرك الرئيسي مع Z, Pr, T0, P_design
+- إنشاء src/lib/engine/structural-concrete-core.ts — الكود السوري + UFC:
+  * calcEffectiveDepth, calcCriticalPerimeter, calcCoreLimit
+  * calcVcdSyrian: v_cd = 0.25√f_cd
+  * calcVcdUSD: v_cd = φ×0.33√f_cd
+  * applyDIF: fcd = fc×1.25, fsd = fy×1.20
+  * calcRequiredThickness, calcRequiredSteel, calcDuctilityRatio
+  * designConcreteSection: المحرك الرئيسي + فحص اللامركزية + القص الثاقب
+- إنشاء src/lib/engine/geometry-comparator.ts — المفاضلة بين RECTANGULAR/CIRCULAR/ARCHED:
+  * أوزان ترجيح قابلة للتعديل (thickness=35, steel=20, safety=35, ductility=10)
+  * compareGeometries: تُعيد GeometryComparisonReport مع التوصية
+- إنشاء src/lib/engine/validators.ts — مُحققات Zod:
+  * PenetrationInputSchema, BlastInputSchema, DesignInputSchema
+  * sanitizeNumber: فحص NaN/Infinity/null/undefined
+  * validateInput: تحقق عام + تحذيرات ذكية
+- إنشاء src/lib/engine/orchestrator.ts — المنسّق العام:
+  * EngineInput/EngineOutput: مدخلات ومخرجات موحدة
+  * runEngine: تدفق كامل → تحقق → اختراق → ضغط → تصميم → مقارنة
+  * معالجة أخطاء شاملة + تحذيرات متراكمة + حالة تنفيذ
+- تحديث src/lib/engine/index.ts — تصدير موحد لكل المكونات
+- حذف src/lib/engine/weapons-library.ts القديم (استُبدل بـ JSON + constants/index.ts)
+- TypeScript: لا أخطاء في ملفات المحرك
+- البناء: next build ناجح (11 routes)
+- الاختبارات: 117/117 PASS
+
+Stage Summary:
+- الملفات المنتجة: 8 ملفات جديدة + 2 محدّثة + 1 محذوف = 11 عملية
+- المحركات: 4 محركات حسابية بمعادلات حقيقية من الأطروحة (Eq. 1-19)
+- كل معادلة دالة مستقلة قابلة للاختبار بشكل منفصل
+- المنسّق: runEngine ينسق بدون منطق حسابي
+- المُحققات: Zod + NaN/Infinity/null/undefined handling
+- الثوابت: JSON + TypeScript adapter layer — Single Source of Truth
+- ملاحظة: معادلات penetration-core و blast-pressure-core هي المعادلات الحقيقية من blastEngine.ts الأصلي
