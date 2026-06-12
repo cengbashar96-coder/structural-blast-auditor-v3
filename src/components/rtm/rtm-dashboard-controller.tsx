@@ -10,12 +10,12 @@
 import React, { useEffect, useState, useCallback, useTransition } from 'react';
 import { db } from '@/lib/storage/db';
 import { rtmRepository } from '@/lib/storage/repositories/RtmRepository';
-import { syncQueueRepository } from '@/lib/storage/repositories/SyncQueueRepository';
 import { ConflictPolicy } from '@/lib/storage/conflictPolicy';
 import type { RtmRecord, SyncQueueRecord } from '@/lib/storage/storageSchemas';
 import { RtmTable } from './rtm-table';
-import { AuditTrail } from './audit-trail';
+import { AuditTrailEnhanced } from './audit-trail-enhanced';
 import { DefectLog } from './defect-log';
+import { VariableTraceabilityMatrix } from './variable-traceability-matrix';
 
 interface BenchmarkResult {
   success: boolean;
@@ -43,6 +43,7 @@ export function RtmDashboardController({ runBenchmarksAction }: ControllerProps)
   >([]);
   const [auditNotification, setAuditNotification] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [activeSection, setActiveSection] = useState<'rtm' | 'traceability' | 'audit'>('rtm');
 
   // جلب البيانات حركياً ومحلياً من IndexedDB فور رندر المكون على المتصفح
   const loadLocalData = useCallback(async () => {
@@ -74,12 +75,11 @@ export function RtmDashboardController({ runBenchmarksAction }: ControllerProps)
       const result = await runBenchmarksAction();
       if (result.success) {
         setAuditNotification(
-          `✔ تم إطلاق نبضة إعادة الفحص الشاملة بنجاح. فحص ${result.checkedScenariosCount} حالة تصميمية. نسبة الحيود: ${result.deviation?.toFixed(2)}%`
+          `تم إطلاق نبضة إعادة الفحص الشاملة بنجاح. فحص ${result.checkedScenariosCount} حالة تصميمية. نسبة الحيود: ${result.deviation?.toFixed(2)}%`
         );
-        // تحديث البيانات المحلية بعد تشغيل النبضة
         await loadLocalData();
       } else {
-        setAuditNotification(`❌ خطأ حوكمي: ${result.error}`);
+        setAuditNotification(`خطأ حوكمي: ${result.error}`);
       }
     });
   };
@@ -90,7 +90,7 @@ export function RtmDashboardController({ runBenchmarksAction }: ControllerProps)
       {auditNotification && (
         <div
           className={`p-3 rounded text-xs flex justify-between items-center ${
-            auditNotification.startsWith('✔')
+            auditNotification.startsWith('✔') || !auditNotification.startsWith('خطأ')
               ? 'bg-emerald-950/30 border border-emerald-900/50 text-emerald-400'
               : 'bg-red-950/30 border border-red-900/50 text-red-400'
           }`}
@@ -135,18 +135,46 @@ export function RtmDashboardController({ runBenchmarksAction }: ControllerProps)
         </div>
       </div>
 
-      {/* لوحة التحكم والجدول الإنشائي المحكم للـ Accessibility */}
-      <RtmTable
-        records={rtmRecords}
-        onTriggerReRun={handleExecuteReRun}
-        isPending={isPending}
-      />
-
-      {/* شاشات تتبع العيوب والتراجع الزمني للتعارضات */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <AuditTrail syncItems={syncQueueItems} conflictLog={conflictLog} />
-        <DefectLog rtmRecords={rtmRecords} />
+      {/* تبويبات الأقسام */}
+      <div className="flex gap-1 border-b border-slate-800">
+        {([
+          { key: 'rtm' as const, label: 'مصفوفة المتطلبات' },
+          { key: 'traceability' as const, label: 'تتبع المتغيرات' },
+          { key: 'audit' as const, label: 'سجل التدقيق والعيوب' },
+        ] as const).map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveSection(tab.key)}
+            className={`px-4 py-2 text-xs font-semibold transition-colors border-b-2 ${
+              activeSection === tab.key
+                ? 'text-emerald-400 border-emerald-500 bg-slate-900/40'
+                : 'text-slate-500 border-transparent hover:text-slate-300'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
+
+      {/* محتوى الأقسام */}
+      {activeSection === 'rtm' && (
+        <RtmTable
+          records={rtmRecords}
+          onTriggerReRun={handleExecuteReRun}
+          isPending={isPending}
+        />
+      )}
+
+      {activeSection === 'traceability' && (
+        <VariableTraceabilityMatrix />
+      )}
+
+      {activeSection === 'audit' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <AuditTrailEnhanced syncItems={syncQueueItems} conflictLog={conflictLog} />
+          <DefectLog rtmRecords={rtmRecords} />
+        </div>
+      )}
     </div>
   );
 }

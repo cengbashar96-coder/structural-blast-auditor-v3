@@ -20,6 +20,7 @@ import {
   Table,
   Shield,
   Scan,
+  FileText,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -48,6 +49,7 @@ const navItems = [
   { title: 'اختبارات المرجعية', href: '/dashboard/benchmark', icon: FlaskConical },
   { title: 'جدول المتغيرات', href: '/dashboard/variables', icon: Table },
   { title: 'مصفوفة المتطلبات RTM', href: '/dashboard/rtm', icon: Shield },
+  { title: 'التقارير', href: '/dashboard/reports', icon: FileText },
 ];
 
 export function AppSidebar() {

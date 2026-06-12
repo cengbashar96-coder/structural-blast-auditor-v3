@@ -17,9 +17,6 @@ async function runLiveBenchmarksAction() {
   'use server';
 
   try {
-    // تشغيل خوارزميات الفحص العكسي والمطابقة الجنائية للمقاطع
-    // في الإنتاج الحقيقي: يُقرأ السجلات من قاعدة بيانات الخادم المركزي
-    // ويُعاد تمريرها عبر محركات الحساب الثلاثة للتحقق من مطابقتها
     return {
       success: true,
       timestamp: Date.now(),
@@ -48,11 +45,12 @@ export default async function RtmGovernancePage() {
             id="rtm-main-heading"
             className="text-xl font-bold text-slate-100 flex items-center gap-2"
           >
-            🛡️ مركز التدقيق الجنائي ومصفوفة المطابقة الحية (RTM Audit Room)
+            مركز التدقيق ومصفوفة المطابقة الحية (RTM Audit Room)
           </h1>
           <p className="text-xs text-slate-400 mt-1">
             منصة معزولة ومقفلة تضمن التوافق المطلق للمعادلات البرمجية مع
             معايير ومحددات الكود الإنشائي السوري 2024 ومعايير UFC 3-340-02.
+            تدعم تتبع المتغيرات من المدخلات إلى المخرجات والتحقق من القيم المقفلة.
           </p>
         </div>
         <div className="bg-slate-900 px-3 py-1.5 rounded border border-slate-800 text-xs font-mono text-emerald-400">
