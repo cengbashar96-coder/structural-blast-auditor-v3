@@ -191,3 +191,64 @@ Stage Summary:
 - الـ RTM حي: لا Mock Data — جميع البيانات من Dexie/IndexedDB المحلية
 - الاختبارات: 88/88 PASS (8 هيكلية + 27 تخزين + 18 مزامنة + 16 PWA/UI + 19 RTM)
 - GitHub: PAT تم إلغاؤه — يحتاج رمز جديد للرفع
+---
+Task ID: 7
+Agent: Main Agent (Super Z)
+Task: تثبيت Benchmark 1-3 + types.ts + مكتبة الأسلحة الموحدة (FAB + US)
+
+Work Log:
+- إنشاء src/lib/engine/types.ts — الأنواع الموحدة (Single Source of Truth):
+  * SoilTypeCode: 'SOFT_SOIL' | 'MEDIUM_SOIL' | 'HARD_ROCK' | 'REINFORCED_SAND'
+  * GeometryType: 'RECTANGULAR' | 'CIRCULAR' | 'ARCHED'
+  * ValidationStatus: 'SUCCESS' | 'WARNING' | 'FAILURE'
+  * WeaponData: واجهة موحدة للقنابل (أمريكية + روسية)
+  * SoilCoefficients: معاملات اختراق التربة مرتبطة بـ SoilTypeCode
+  * PenetrationInput/Output: مدخلات ومخرجات محرك الاختراق
+  * BlastInput/Output: مدخلات ومخرجات محرك الضغط العصفي
+  * DesignInput: مدخلات محرك التصميم الإنشائي
+  * ValidationReport: تقرير التحقق مع ruleId ونسب
+  * SectionDesignResult: نتيجة تصميم المقطع (سماكة + تسليح + مطاوعة)
+  * GeometryComparisonReport: مقارنة المقاطع الهندسية
+  * BenchmarkCase: حالة اختبار مرجعية كاملة (inputSpec + referenceSpec + expectedIntermediateValues + expectedFinalValues + expectedFinalDecision + engineNotes)
+  * ExpectedValue: قيمة مرجعية مع رمز + وحدة + تسامح
+  * BenchmarkResult / BenchmarkRunReport: نتائج تشغيل الـ Benchmarks
+  * SOIL_CODE_TO_REFERENCE_NAME / SOIL_CODE_TO_AR: تعيين رموز التربة لأسماء SOIL_TABLE
+
+- إنشاء src/lib/engine/benchmarks/bmk-01.ts — BMK-01: Low-impact penetration benchmark
+  * FAB-250 + V=200 m/s + SOFT_SOIL
+  * 6 قيم وسيطة + 3 قيم نهائية (x1, h0, Pso)
+  * القيم المرجعية TODO — تُملأ من Excel بعد تشغيل المحرك
+
+- إنشاء src/lib/engine/benchmarks/bmk-02.ts — BMK-02: Design-critical medium case
+  * FAB-500 + V=350 m/s + MEDIUM_SOIL + fc=35 + fy=420
+  * 12 قيمة وسيطة (lambda1, lambda2, n, C_eff, x1, h_bar_z, Z, sigma_max, Pr, T0, DIF_c, DIF_s)
+  * 5 قيم نهائية (P_design, ht, As, e/h, v_actual/v_cd)
+  * DIF_c=1.25 و DIF_s=1.20 مثبتتان كقيم UFC
+
+- إنشاء src/lib/engine/benchmarks/bmk-03.ts — BMK-03: Critical hard-rock failure benchmark
+  * FAB-1500 + V=450 m/s + HARD_ROCK
+  * 9 قيم وسيطة + 4 قيم نهائية (penetrationDepth, spallingThickness, P_design, e/h)
+  * الحالة تتوقع WARNING_OR_FAILURE — فشل هش و spalling
+  * شرط e <= h/6 يجب أن يُفشل هنا
+
+- إنشاء src/lib/engine/benchmarks/index.ts — التصدير الموحد + دوال بحث (getBenchmarkById, getBenchmarksBySoilType, getBenchmarksByPriority)
+
+- إنشاء src/lib/engine/weapons-library.ts — مكتبة الأسلحة الموحدة:
+  * FAB_WEAPONS_LIBRARY: FAB-250, FAB-500, FAB-1500 (روسية)
+  * UNIFIED_WEAPONS_LIBRARY: يجمع الأمريكية (14) + الروسية (3) = 17 سلاح
+  * دوال بحث: getWeaponById, getWeaponByName, getWeaponsLibraryStats
+  * تحويل BombData → WeaponData تلقائياً
+
+- إنشاء src/lib/engine/index.ts — التصدير الرئيسي الموحد
+
+- التحقق: TypeScript بدون أخطاء في الملفات الجديدة
+- البناء: next build ناجح (11 routes)
+- الاختبارات: 117/117 PASS (6 ملفات)
+
+Stage Summary:
+- الملفات المنتجة: 6 ملفات TypeScript جديدة (types.ts + 3 benchmarks + weapons-library + 2 index)
+- الأنواع الموحدة: 20+ نوع/واجهة تشمل كامل خط الحساب (اختراق → انفجار → تصميم → تحقق)
+- Benchmarks: 3 حالات مرجعية (منخفض/متوسط/حرج) بقوالب قابلة للتوسع
+- مكتبة الأسلحة: 17 سلاح (14 أمريكية + 3 روسية FAB) موحدة في WeaponData
+- التعيينات: SoilTypeCode ↔ SOIL_TABLE.name مُثبَّتة ولا يمكن تعديلها بدون مراجعة
+- القيم المرجعية: TODO — تُملأ من Excel بعد كتابة penetration-core
