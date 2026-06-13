@@ -21,6 +21,8 @@ import {
   Shield,
   Scan,
   FileText,
+  Settings,
+  Info,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -50,6 +52,8 @@ const navItems = [
   { title: 'جدول المتغيرات', href: '/dashboard/variables', icon: Table },
   { title: 'مصفوفة المتطلبات RTM', href: '/dashboard/rtm', icon: Shield },
   { title: 'التقارير', href: '/dashboard/reports', icon: FileText },
+  { title: 'الإعدادات', href: '/dashboard/settings', icon: Settings },
+  { title: 'حول المنصة', href: '/dashboard/about', icon: Info },
 ];
 
 export function AppSidebar() {
