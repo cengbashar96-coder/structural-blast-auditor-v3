@@ -85,6 +85,25 @@ enum SyncQueueStatus {
   FAILED     // فشل — يحتاج مراجعة يدوية
 }
 
+/// حالات اشتراك المستخدم — تدار حصرياً من قبل المدير الحوكمي
+enum SubscriptionStatus {
+  PENDING     // معلّق — بانتظار موافقة المدير
+  APPROVED    // موافق عليه — مستخدم فعّال
+  REJECTED    // مرفوض — طلب الاشتراك مرفوض
+  SUSPENDED   // موقوف — اشتراك موقوف من المدير
+}
+
+/// الأذونات التفصيلية — تُمنح من قبل المدير لكل مستخدم على حدة
+enum Permission {
+  CAN_RUN_ENGINE        // تشغيل محرك الحسابات
+  CAN_MODIFY_INPUTS     // تعديل المدخلات الهندسية
+  CAN_VIEW_REPORTS      // عرض التقارير
+  CAN_EXPORT_DATA       // تصدير البيانات
+  CAN_MODIFY_BASELINE   // تعديل خط الأساس (يتطلب دور ADMIN)
+  CAN_MANAGE_PROJECTS   // إدارة المشاريع
+  CAN_AUDIT             // الوصول لسجل التدقيق
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 // 🛡️ 1. جدول سجلات المعالجة ومنع التكرار (ProcessedEvent)
 // ═══════════════════════════════════════════════════════════════════════
@@ -298,16 +317,17 @@ model AuditLog {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// 🔐 6. جدول المستخدمين والأدوار (User)
+// 🔐 6. جدول المستخدمين والأدوار والاشتراكات (User)
 // ═══════════════════════════════════════════════════════════════════════
-// إدارة هويات المهندسين والمراقبين مع أدوار حوكمية.
+// إدارة هويات المهندسين والمراقبين مع أدوار حوكمية
+// وحالة اشتراك يديرها المدير الحوكمي الأعلى حصرياً.
 
 model User {
   /// المعرف الأساسي — UUID
-  id                String   @id @default(uuid())
+  id                String             @id @default(uuid())
 
   /// البريد الإلكتروني المؤسسي — فريد
-  email             String   @unique
+  email             String             @unique
 
   /// الاسم الكامل
   displayName       String
@@ -316,20 +336,43 @@ model User {
   passwordHash      String
 
   /// الدور الحوكمي — ADMIN, ENGINEER, VIEWER
-  role              String   @default("ENGINEER")
+  role              String             @default("ENGINEER")
 
   /// رقم النقابة الهندسية — مطلوب للمهندسين
-  syndicateId       String?  @unique
+  syndicateId       String?            @unique
 
   /// التخصص الهندسي
   specialization    String?
 
+  /// حالة الاشتراك — تدار حصرياً من قبل المدير
+  /// PENDING: مستخدم جديد بانتظار الموافقة
+  /// APPROVED: مستخدم فعّال يمكنه استخدام المنصة
+  /// REJECTED: طلب اشتراك مرفوض
+  /// SUSPENDED: اشتراك موقوف من المدير
+  subscriptionStatus SubscriptionStatus @default(PENDING)
+
+  /// سبب الرفض أو الإيقاف — يُسجّل من قبل المدير
+  statusReason      String?
+
+  /// الأذونات التفصيلية — تُمنح من قبل المدير لكل مستخدم
+  permissions       Permission[]       @default([])
+
+  /// معرف المدير الذي غيّر الحالة — للتتبع الحوكمي
+  approvedBy        String?
+
+  /// لحظة الموافقة/الرفض
+  statusChangedAt   DateTime?
+
   /// لحظة الإنشاء
-  createdAt         DateTime @default(now())
+  createdAt         DateTime           @default(now())
 
   /// لحظة آخر تحديث
-  updatedAt         DateTime @updatedAt
+  updatedAt         DateTime           @updatedAt
 
   /// فهرس على الدور — لتسريع فلترة المستخدمين حسب الصلاحيات
   @@index([role])
+  /// فهرس على حالة الاشتراك — لتسريع فلترة الطلبات المعلقة
+  @@index([subscriptionStatus])
+  /// فهرس مركب — لتسريع استعلامات المدير (الدور + الحالة)
+  @@index([role, subscriptionStatus])
 }

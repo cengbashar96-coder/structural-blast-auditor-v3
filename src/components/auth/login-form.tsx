@@ -41,7 +41,8 @@ export function LoginForm() {
       const result = await loginAction(formData);
 
       if (result.success) {
-        router.push('/admin');
+        // تحويل حسب الدور
+        router.push('/dashboard');
       } else {
         setError(result.error || 'فشل تسجيل الدخول');
       }

@@ -9,17 +9,20 @@
  *   ٣. تسجيل الحدث في طابور التدقيق (غير حاجب)
  *   ٤. إرجاع payload صغير ورشيق للواجهة (Lightweight Response)
  *
- * ⚠️ لا يُستخدم localStorage للجلسة أو الأدوار — التحقق خادومي بالكامل
- * ⚠️ RBAC يتم داخل Server Action نفسها وليس فقط في الواجهة
+ * ✅ تحقق حقيقي من كلمات المرور عبر bcrypt
+ * ✅ حفظ المستخدمين في قاعدة بيانات Prisma
+ * ✅ حالة اشتراك PENDING افتراضياً حتى موافقة المدير
  * ═══════════════════════════════════════════════════════════════════════
  */
 
 'use server';
 
+import { prisma } from '@/lib/db/prisma';
 import { generateSovereignId } from '@/lib/id-utility';
 import { getSession, createUserSession, setSessionCookie, destroySession, refreshSession } from '@/lib/session';
 import { enforceAdminPolicy, USER_ROLES, AuthorizationError } from '@/lib/rbac';
 import { dispatchToAuditQueue, AUDIT_EVENTS, AUDIT_SEVERITY } from '@/lib/audit';
+import { hashPassword, verifyPassword } from '@/lib/password';
 import { z } from 'zod';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -51,7 +54,6 @@ export const RegistrationSchema = z.object({
   message: 'كلمة المرور وتأكيدها غير متطابقتين',
   path: ['confirmPassword'],
 }).refine((data) => {
-  // إذا طلب دور المهندس، يجب تقديم رقم النقابة والتخصص
   if (data.requestedRole === USER_ROLES.ENGINEER) {
     return !!data.syndicateId && data.syndicateId.length >= 3 && !!data.specialization && data.specialization.length >= 3;
   }
@@ -74,12 +76,6 @@ const LoginSchema = z.object({
 // 🏛️ حالة خط الأساس الحسابي — Baseline Lock State
 // ═══════════════════════════════════════════════════════════════════════
 
-/**
- * حالة قفل خط الأساس — تُخزَّن في الذاكرة مؤقتاً
- *
- * ⚠️ في الإنتاج، يجب نقل هذه الحالة إلى قاعدة بيانات أو Redis
- *    لضمان الاتساق بين خوادم متعددة.
- */
 let baselineLocked = false;
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -88,16 +84,6 @@ let baselineLocked = false;
 
 /**
  * إجراء قفل/فتح خط الأساس الحسابي
- *
- * التدفق السيادي:
- *   ١. توليد contextId موحد
- *   ٢. قراءة الجلسة المشفرة
- *   ٣. فرض سياسة المدير (enforceAdminPolicy) داخل Server Action
- *   ٤. تنفيذ العملية (قفل/فتح)
- *   ٥. تسجيل الحدث في طابور التدقيق (غير حاجب)
- *   ٦. إرجاع payload صغير ورشيق للواجهة
- *
- * ⚠️ التحقق من RBAC يتم هنا (على الخادم) وليس فقط في الواجهة
  */
 export async function toggleBaselineLockAction(): Promise<{
   success: boolean;
@@ -105,15 +91,12 @@ export async function toggleBaselineLockAction(): Promise<{
   contextId: string;
   error?: string;
 }> {
-  // ١. توليد معرف السياق التنفيذي الموحد
   const contextId = generateSovereignId('CTX');
 
   try {
-    // ٢. قراءة الجلسة المشفرة من الحلوية
     const session = await getSession();
 
     if (!session) {
-      // تسجيل محاولة الوصول بدون جلسة
       dispatchToAuditQueue({
         contextId,
         event: AUDIT_EVENTS.ACCESS_DENIED,
@@ -123,16 +106,9 @@ export async function toggleBaselineLockAction(): Promise<{
         description: 'محاولة تبديل قفل خط الأساس بدون جلسة صالحة',
       });
 
-      return {
-        success: false,
-        isLocked: baselineLocked,
-        contextId,
-        error: 'يجب تسجيل الدخول أولاً',
-      };
+      return { success: false, isLocked: baselineLocked, contextId, error: 'يجب تسجيل الدخول أولاً' };
     }
 
-    // ٣. فرض سياسة المدير — التحقق الخادومي الحصري من RBAC
-    // ⚠️ هذا هو الجدار الحقيقي — لا يمكن الالتفاف عليه من المتصفح
     const verifiedAdmin = enforceAdminPolicy({
       userId: session.userId,
       role: session.role,
@@ -141,10 +117,8 @@ export async function toggleBaselineLockAction(): Promise<{
       specialization: session.specialization,
     });
 
-    // ٤. تنفيذ العملية — تبديل حالة القفل
     baselineLocked = !baselineLocked;
 
-    // ٥. تسجيل الحدث في طابور التدقيق — غير حاجب للأداء
     dispatchToAuditQueue({
       contextId,
       event: baselineLocked ? AUDIT_EVENTS.BASELINE_LOCK : AUDIT_EVENTS.BASELINE_UNLOCK,
@@ -154,21 +128,11 @@ export async function toggleBaselineLockAction(): Promise<{
       description: baselineLocked
         ? `قفل خط الأساس الحسابي بواسطة ${verifiedAdmin.displayName}`
         : `فتح خط الأساس الحسابي بواسطة ${verifiedAdmin.displayName}`,
-      metadata: {
-        previousState: !baselineLocked,
-        newState: baselineLocked,
-        adminRole: verifiedAdmin.role,
-      },
+      metadata: { previousState: !baselineLocked, newState: baselineLocked },
     });
 
-    // ٦. إرجاع payload صغير ورشيق — يمنع الـ Re-renders العشوائية
-    return {
-      success: true,
-      isLocked: baselineLocked,
-      contextId,
-    };
+    return { success: true, isLocked: baselineLocked, contextId };
   } catch (error: unknown) {
-    // التعامل مع خطأ التفويض — محاولة وصول مرفوضة
     if (error instanceof AuthorizationError) {
       dispatchToAuditQueue({
         contextId,
@@ -177,21 +141,12 @@ export async function toggleBaselineLockAction(): Promise<{
         userId: error.userId,
         userRole: error.actualRole,
         description: error.message,
-        metadata: {
-          requiredRole: error.requiredRole,
-          actualRole: error.actualRole,
-        },
+        metadata: { requiredRole: error.requiredRole, actualRole: error.actualRole },
       });
 
-      return {
-        success: false,
-        isLocked: baselineLocked,
-        contextId,
-        error: 'صلاحيات غير كافية — هذا الإجراء يتطلب دور المدير الحوكمي',
-      };
+      return { success: false, isLocked: baselineLocked, contextId, error: 'صلاحيات غير كافية — هذا الإجراء يتطلب دور المدير الحوكمي' };
     }
 
-    // أخطاء غير متوقعة
     const message = error instanceof Error ? error.message : 'خطأ غير معروف';
 
     dispatchToAuditQueue({
@@ -203,39 +158,31 @@ export async function toggleBaselineLockAction(): Promise<{
       description: `خطأ غير متوقع في تبديل قفل خط الأساس: ${message}`,
     });
 
-    return {
-      success: false,
-      isLocked: baselineLocked,
-      contextId,
-      error: 'حدث خطأ أثناء تنفيذ العملية',
-    };
+    return { success: false, isLocked: baselineLocked, contextId, error: 'حدث خطأ أثناء تنفيذ العملية' };
   }
 }
 
 /**
  * إجراء قراءة حالة خط الأساس
- *
- * متاح لجميع المستخدمين المصادق عليهم (لا يتطلب دور ADMIN)
  */
 export async function getBaselineLockStatusAction(): Promise<{
   isLocked: boolean;
   contextId: string;
 }> {
   const contextId = generateSovereignId('CTX');
-  return {
-    isLocked: baselineLocked,
-    contextId,
-  };
+  return { isLocked: baselineLocked, contextId };
 }
 
 /**
- * إجراء تسجيل مستخدم جديد
+ * إجراء تسجيل مستخدم جديد — ✅ حفظ حقيقي في قاعدة البيانات
  *
- * يقوم ب:
- *   ١. التحقق من المدخلات عبر Zod (صمام أمان)
- *   ٢. إنشاء الجلسة المشفرة
- *   ٣. زرع حلوية الجلسة الآمنة
- *   ٤. تسجيل الحدث في طابور التدقيق
+ * التدفق الكامل:
+ *   ١. التحقق من المدخلات عبر Zod
+ *   ٢. التحقق من عدم تكرار البريد الإلكتروني
+ *   ٣. تشفير كلمة المرور عبر bcrypt
+ *   ④. حفظ المستخدم في قاعدة البيانات بحالة PENDING
+ *   ⑤. إنشاء الجلسة المشفرة
+ *   ⑥. تسجيل الحدث في طابور التدقيق
  */
 export async function registerAction(formData: FormData): Promise<{
   success: boolean;
@@ -246,7 +193,6 @@ export async function registerAction(formData: FormData): Promise<{
   const contextId = generateSovereignId('CTX');
 
   try {
-    // ١. استخراج البيانات من النموذج
     const rawData = {
       displayName: formData.get('displayName') as string,
       email: formData.get('email') as string,
@@ -257,11 +203,9 @@ export async function registerAction(formData: FormData): Promise<{
       requestedRole: (formData.get('requestedRole') as string) || USER_ROLES.ENGINEER,
     };
 
-    // ٢. التحقق عبر Zod — صمام أمان المدخلات
     const validationResult = RegistrationSchema.safeParse(rawData);
 
     if (!validationResult.success) {
-      // تحويل أخطاء Zod إلى تنسيق سهل للعرض
       const errors: Record<string, string[]> = {};
       for (const issue of validationResult.error.issues) {
         const key = issue.path[0]?.toString() || 'general';
@@ -279,48 +223,64 @@ export async function registerAction(formData: FormData): Promise<{
         metadata: { validationErrors: errors },
       });
 
-      return {
-        success: false,
-        contextId,
-        error: 'بيانات التسجيل غير صالحة',
-        errors,
-      };
+      return { success: false, contextId, error: 'بيانات التسجيل غير صالحة', errors };
     }
 
     const validatedData = validationResult.data;
 
-    // ٣. إنشاء الجلسة المشفرة — بدون تخزين كلمة المرور
-    // ⚠️ في الإنتاج: يجب تخزين hash لكلمة المرور في قاعدة بيانات
-    const session = createUserSession({
-      userId: generateSovereignId('SSN'), // ← معرف المستخدم السيادي
-      role: validatedData.requestedRole,
-      displayName: validatedData.displayName,
-      syndicateId: validatedData.syndicateId,
-      specialization: validatedData.specialization,
+    // ✅ التحقق من عدم تكرار البريد الإلكتروني
+    const existingUser = await prisma.user.findUnique({
+      where: { email: validatedData.email },
     });
 
-    // ٤. زرع حلوية الجلسة الآمنة
+    if (existingUser) {
+      return { success: false, contextId, error: 'البريد الإلكتروني مسجل بالفعل — استخدم بريداً مختلفاً أو سجّل الدخول' };
+    }
+
+    // ✅ تشفير كلمة المرور عبر bcrypt
+    const passwordHash = await hashPassword(validatedData.password);
+
+    // ✅ حفظ المستخدم في قاعدة البيانات بحالة PENDING
+    const newUser = await prisma.user.create({
+      data: {
+        email: validatedData.email,
+        displayName: validatedData.displayName,
+        passwordHash,
+        role: validatedData.requestedRole,
+        syndicateId: validatedData.syndicateId || null,
+        specialization: validatedData.specialization || null,
+        subscriptionStatus: 'PENDING',
+        permissions: [],
+      },
+    });
+
+    // إنشاء الجلسة المشفرة
+    const session = createUserSession({
+      userId: newUser.id,
+      role: newUser.role as any,
+      displayName: newUser.displayName,
+      syndicateId: newUser.syndicateId || undefined,
+      specialization: newUser.specialization || undefined,
+    });
+
     await setSessionCookie(session);
 
-    // ٥. تسجيل الحدث في طابور التدقيق — غير حاجب
     dispatchToAuditQueue({
       contextId,
       event: AUDIT_EVENTS.REGISTER,
       severity: AUDIT_SEVERITY.INFO,
-      userId: session.userId,
-      userRole: session.role,
-      description: `تسجيل مستخدم جديد: ${validatedData.displayName} (${validatedData.email}) بدور ${validatedData.requestedRole}`,
+      userId: newUser.id,
+      userRole: newUser.role,
+      description: `تسجيل مستخدم جديد: ${validatedData.displayName} (${validatedData.email}) بدور ${validatedData.requestedRole} — بانتظار موافقة المدير`,
       metadata: {
         email: validatedData.email,
         role: validatedData.requestedRole,
         hasSyndicateId: !!validatedData.syndicateId,
+        subscriptionStatus: 'PENDING',
       },
     });
 
-    return {
-      success: true,
-      contextId,
-    };
+    return { success: true, contextId };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'خطأ غير معروف';
 
@@ -333,21 +293,25 @@ export async function registerAction(formData: FormData): Promise<{
       description: `خطأ غير متوقع في تسجيل المستخدم: ${message}`,
     });
 
-    return {
-      success: false,
-      contextId,
-      error: 'حدث خطأ أثناء التسجيل',
-    };
+    return { success: false, contextId, error: 'حدث خطأ أثناء التسجيل' };
   }
 }
 
 /**
- * إجراء تسجيل الدخول
+ * إجراء تسجيل الدخول — ✅ تحقق حقيقي من كلمة المرور
+ *
+ * التدفق الكامل:
+ *   ١. التحقق من المدخلات عبر Zod
+ *   ٢. البحث عن المستخدم في قاعدة البيانات
+ *   ③. التحقق من كلمة المرور عبر bcrypt
+ *   ④. التحقق من حالة الاشتراك
+ *   ⑤. إنشاء الجلسة المشفرة
  */
 export async function loginAction(formData: FormData): Promise<{
   success: boolean;
   contextId: string;
   error?: string;
+  subscriptionStatus?: string;
 }> {
   const contextId = generateSovereignId('CTX');
 
@@ -369,19 +333,78 @@ export async function loginAction(formData: FormData): Promise<{
         description: `فشل تسجيل دخول — بيانات غير صالحة: ${rawData.email}`,
       });
 
+      return { success: false, contextId, error: 'بيانات الدخول غير صالحة' };
+    }
+
+    // ✅ البحث عن المستخدم في قاعدة البيانات
+    const user = await prisma.user.findUnique({
+      where: { email: validationResult.data.email },
+    });
+
+    if (!user) {
+      dispatchToAuditQueue({
+        contextId,
+        event: AUDIT_EVENTS.LOGIN,
+        severity: AUDIT_SEVERITY.WARN,
+        userId: 'ANONYMOUS',
+        userRole: 'NONE',
+        description: `فشل تسجيل دخول — مستخدم غير موجود: ${validationResult.data.email}`,
+      });
+
+      return { success: false, contextId, error: 'البريد الإلكتروني أو كلمة المرور غير صحيحة' };
+    }
+
+    // ✅ التحقق من كلمة المرور عبر bcrypt
+    const isPasswordValid = await verifyPassword(validationResult.data.password, user.passwordHash);
+
+    if (!isPasswordValid) {
+      dispatchToAuditQueue({
+        contextId,
+        event: AUDIT_EVENTS.LOGIN,
+        severity: AUDIT_SEVERITY.WARN,
+        userId: user.id,
+        userRole: user.role,
+        description: `فشل تسجيل دخول — كلمة مرور خاطئة: ${validationResult.data.email}`,
+      });
+
+      return { success: false, contextId, error: 'البريد الإلكتروني أو كلمة المرور غير صحيحة' };
+    }
+
+    // ✅ التحقق من حالة الاشتراك — المدير يتجاوز هذا التحديد
+    if (user.role !== USER_ROLES.ADMIN && user.subscriptionStatus !== 'APPROVED') {
+      const statusMessage =
+        user.subscriptionStatus === 'PENDING'
+          ? 'حسابك بانتظار موافقة المدير — يرجى الانتظار حتى يتم قبول اشتراكك'
+          : user.subscriptionStatus === 'REJECTED'
+          ? 'تم رفض طلب اشتراكك — تواصل مع المدير الحوكمي للمزيد من المعلومات'
+          : user.subscriptionStatus === 'SUSPENDED'
+          ? 'حسابك موقوف — تواصل مع المدير الحوكمي لإعادة التفعيل'
+          : 'حالة الاشتراك غير معروفة — تواصل مع المدير';
+
+      dispatchToAuditQueue({
+        contextId,
+        event: AUDIT_EVENTS.ACCESS_DENIED,
+        severity: AUDIT_SEVERITY.WARN,
+        userId: user.id,
+        userRole: user.role,
+        description: `محاولة دخول مستخدم غير موافق عليه: ${user.email} (حالة: ${user.subscriptionStatus})`,
+      });
+
       return {
         success: false,
         contextId,
-        error: 'بيانات الدخول غير صالحة',
+        error: statusMessage,
+        subscriptionStatus: user.subscriptionStatus,
       };
     }
 
-    // ⚠️ في الإنتاج: التحقق من كلمة المرور مقابل الـ hash المخزن
-    // للآن: إنشاء جلسة افتراضية (Transition Implementation)
+    // ✅ إنشاء الجلسة المشفرة ببيانات المستخدم الحقيقية من قاعدة البيانات
     const session = createUserSession({
-      userId: generateSovereignId('SSN'),
-      role: USER_ROLES.ENGINEER, // ← دور افتراضي — يُحدَّث من قاعدة البيانات
-      displayName: validationResult.data.email.split('@')[0],
+      userId: user.id,
+      role: user.role as any,
+      displayName: user.displayName,
+      syndicateId: user.syndicateId || undefined,
+      specialization: user.specialization || undefined,
     });
 
     await setSessionCookie(session);
@@ -390,15 +413,12 @@ export async function loginAction(formData: FormData): Promise<{
       contextId,
       event: AUDIT_EVENTS.LOGIN,
       severity: AUDIT_SEVERITY.INFO,
-      userId: session.userId,
-      userRole: session.role,
-      description: `تسجيل دخول ناجح: ${validationResult.data.email}`,
+      userId: user.id,
+      userRole: user.role,
+      description: `تسجيل دخول ناجح: ${user.email} بدور ${user.role}`,
     });
 
-    return {
-      success: true,
-      contextId,
-    };
+    return { success: true, contextId, subscriptionStatus: user.subscriptionStatus };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'خطأ غير معروف';
 
@@ -411,11 +431,7 @@ export async function loginAction(formData: FormData): Promise<{
       description: `خطأ غير متوقع في تسجيل الدخول: ${message}`,
     });
 
-    return {
-      success: false,
-      contextId,
-      error: 'حدث خطأ أثناء تسجيل الدخول',
-    };
+    return { success: false, contextId, error: 'حدث خطأ أثناء تسجيل الدخول' };
   }
 }
 
@@ -444,24 +460,15 @@ export async function logoutAction(): Promise<{
 
     await destroySession();
 
-    return {
-      success: true,
-      contextId,
-    };
+    return { success: true, contextId };
   } catch {
     await destroySession();
-
-    return {
-      success: true,
-      contextId,
-    };
+    return { success: true, contextId };
   }
 }
 
 /**
  * إجراء التحقق من الجلسة الحالية
- *
- * يُستخدم لمعرفة حالة المستخدم في الواجهة
  */
 export async function checkSessionAction(): Promise<{
   isAuthenticated: boolean;
@@ -480,10 +487,7 @@ export async function checkSessionAction(): Promise<{
     const session = await refreshSession();
 
     if (!session) {
-      return {
-        isAuthenticated: false,
-        contextId,
-      };
+      return { isAuthenticated: false, contextId };
     }
 
     return {
@@ -498,9 +502,6 @@ export async function checkSessionAction(): Promise<{
       contextId,
     };
   } catch {
-    return {
-      isAuthenticated: false,
-      contextId,
-    };
+    return { isAuthenticated: false, contextId };
   }
 }

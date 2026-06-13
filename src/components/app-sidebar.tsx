@@ -23,6 +23,7 @@ import {
   FileText,
   Settings,
   Info,
+  Crown,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -36,6 +37,7 @@ import {
   SidebarMenuItem,
   SidebarFooter,
   SidebarRail,
+  SidebarSeparator,
 } from '@/components/ui/sidebar';
 import { Badge } from '@/components/ui/badge';
 import { NetworkStatus } from '@/components/network-status';
@@ -55,6 +57,9 @@ const navItems = [
   { title: 'الإعدادات', href: '/dashboard/settings', icon: Settings },
   { title: 'حول المنصة', href: '/dashboard/about', icon: Info },
 ];
+
+// ─── رابط المدير الحوكمي — يظهر فقط للمديرين ───
+const adminItem = { title: 'لوحة المدير', href: '/admin', icon: Crown };
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -117,6 +122,36 @@ export function AppSidebar() {
                   </SidebarMenuItem>
                 );
               })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* ─── فاصل ─── */}
+        <SidebarSeparator className="bg-slate-800/60" />
+
+        {/* ─── قسم المدير الحوكمي ─── */}
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-amber-500/70 text-xs mb-1 group-data-[collapsible=icon]:hidden">
+            الإدارة الحوكمية
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  tooltip={adminItem.title}
+                  className={
+                    pathname.startsWith('/admin')
+                      ? 'bg-amber-900/30 text-amber-400 border-r-2 border-amber-500 font-semibold hover:bg-amber-900/40 hover:text-amber-300'
+                      : 'text-amber-500/70 hover:text-amber-400 hover:bg-amber-900/20'
+                  }
+                >
+                  <Link href={adminItem.href}>
+                    <Crown className="size-4" />
+                    <span>{adminItem.title}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

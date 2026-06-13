@@ -113,9 +113,9 @@ export function RegisterForm() {
       const result = await registerAction(formData);
 
       if (result.success) {
-        setSuccessMessage('تم التسجيل بنجاح! جارٍ التحويل...');
-        // تحويل إلى لوحة التحكم بعد تسجيل ناجح
-        setTimeout(() => router.push('/dashboard'), 1500);
+        setSuccessMessage('تم التسجيل بنجاح! حسابك بانتظار موافقة المدير الحوكمي. سيتم إشعارك عند قبول اشتراكك.');
+        // تحويل إلى صفحة الانتظار بعد تسجيل ناجح
+        setTimeout(() => router.push('/auth/pending'), 3000);
       } else {
         if (result.errors) {
           setFieldErrors(result.errors);
