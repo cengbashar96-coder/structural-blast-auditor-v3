@@ -8,13 +8,18 @@
  *
  * خصائص الأمان:
  *   ✅ httpOnly: true      — حظر كامل للوصول من JavaScript في المتصفح
- *   ✅ sameSite: 'strict'  — حماية ضد هجمات CSRF
+ *   ✅ sameSite: 'lax'     — حماية ضد هجمات CSRF مع السماح بالتنقل
  *   ✅ secure: true        — الإنتاج فقط — نقل الحلوية عبر HTTPS فقط
  *   ✅ maxAge: 1800        — 30 دقيقة فقط (Short-lived Session)
  *   ✅ path: '/'           — نطاق الحلوية يشمل التطبيق بالكامل
  *
  * ⚠️ لا تُستخدم localStorage للجلسة أو الأدوار الحساسة نهائياً
  * ⚠️ جميع البيانات الحساسة مشفرة ومخزنة في حلوية httpOnly
+ *
+ * ملاحظات بيئة Netlify:
+ *   - Server Actions تعمل كـ Netlify Functions
+ *   - Cookies تُدار عبر next/headers وتعمل بشكل طبيعي
+ *   - sameSite: 'strict' قد يسبب مشاكل مع redirects → نستخدم 'lax'
  * ═══════════════════════════════════════════════════════════════════════
  */
 
@@ -103,17 +108,24 @@ export function createUserSession(params: {
  * @param session - بيانات الجلسة المراد زرعها
  */
 export async function setSessionCookie(session: UserSession): Promise<void> {
-  const vault = getCryptoVault();
-  const encryptedPayload = vault.encrypt(JSON.stringify(session));
+  try {
+    const vault = getCryptoVault();
+    const encryptedPayload = vault.encrypt(JSON.stringify(session));
 
-  const cookieStore = await cookies();
-  cookieStore.set(SESSION_COOKIE_NAME, encryptedPayload, {
-    httpOnly: true,
-    sameSite: 'strict',
-    secure: process.env.NODE_ENV === 'production',
-    maxAge: SESSION_MAX_AGE,
-    path: '/',
-  });
+    const cookieStore = await cookies();
+    cookieStore.set(SESSION_COOKIE_NAME, encryptedPayload, {
+      httpOnly: true,
+      // ❗ sameSite: 'strict' يمنع إرسال الكوكي بعد redirect خارجي
+      // نستخدم 'lax' للسماح بالتنقل مع الحفاظ على الحماية من CSRF
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: SESSION_MAX_AGE,
+      path: '/',
+    });
+  } catch (error) {
+    console.error('[Session] Failed to set session cookie:', error);
+    throw new Error('فشل إنشاء جلسة المصادقة — تحقق من ENCRYPTION_KEY');
+  }
 }
 
 /**
@@ -151,10 +163,10 @@ export async function getSession(): Promise<UserSession | null> {
     }
 
     return session;
-  } catch {
+  } catch (error) {
     // أي خطأ في فك التشفير أو التحليل → الجلسة غير صالحة
-    // لا نُسجّل الخطأ تفصيلياً لتجنب تسريب معلومات حساسة
-    await destroySession();
+    console.warn('[Session] Failed to read session:', error instanceof Error ? error.message : 'unknown');
+    // لا ندمر الجلسة هنا لتجنب الأخطاء المتسلسلة
     return null;
   }
 }
@@ -182,8 +194,12 @@ export async function refreshSession(): Promise<UserSession | null> {
  * يُستدعى عند تسجيل الخروج أو عند اكتشاف نشاط مشبوه.
  */
 export async function destroySession(): Promise<void> {
-  const cookieStore = await cookies();
-  cookieStore.delete(SESSION_COOKIE_NAME);
+  try {
+    const cookieStore = await cookies();
+    cookieStore.delete(SESSION_COOKIE_NAME);
+  } catch {
+    // تجاهل الأخطاء عند تدمير الجلسة
+  }
 }
 
 /**

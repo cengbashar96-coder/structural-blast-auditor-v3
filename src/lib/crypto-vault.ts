@@ -179,10 +179,13 @@ export class CryptoVault {
  * في بيئة التطوير، إذا لم يُوجد المفتاح، يُولَّد واحد مؤقت مع تحذير.
  *
  * ⚠️ في الإنتاج: يجب تعيين ENCRYPTION_KEY صراحةً وإلا سيفشل التطبيق
+ * ⚠️ في Netlify Serverless: يتم إعادة إنشاء النسخة لكل invocation
+ *    لأن الـ global state لا يتشارك بين invocations
  */
 let _vaultInstance: CryptoVault | null = null;
 
 export function getCryptoVault(): CryptoVault {
+  // في serverless، نعيد استخدام النسخة داخل نفس الـ invocation
   if (_vaultInstance) return _vaultInstance;
 
   const keyHex = process.env.ENCRYPTION_KEY;
@@ -191,7 +194,8 @@ export function getCryptoVault(): CryptoVault {
     if (process.env.NODE_ENV === 'production') {
       throw new Error(
         '[CryptoVault] ENCRYPTION_KEY غير معرَّف في بيئة الإنتاج! ' +
-        'يجب تعيين متغير البيئة ENCRYPTION_KEY بصيغة hex (64 حرف).'
+        'يجب تعيين متغير البيئة ENCRYPTION_KEY بصيغة hex (64 حرف). ' +
+        'على Netlify: Site settings → Environment variables → ENCRYPTION_KEY'
       );
     }
 
@@ -206,6 +210,21 @@ export function getCryptoVault(): CryptoVault {
     return _vaultInstance;
   }
 
+  // التحقق من طول المفتاح قبل إنشاء النسخة
+  if (keyHex.length !== 64) {
+    throw new Error(
+      `[CryptoVault] ENCRYPTION_KEY بطول غير صحيح: متوقع 64 حرف hex، تم استلام ${keyHex.length} حرف. ` +
+      'لتوليد مفتاح: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"'
+    );
+  }
+
   _vaultInstance = new CryptoVault(keyHex);
   return _vaultInstance;
+}
+
+/**
+ * إعادة تعيين النسخة — للاستخدام في الاختبارات فقط
+ */
+export function resetCryptoVault(): void {
+  _vaultInstance = null;
 }

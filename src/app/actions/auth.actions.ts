@@ -6,11 +6,11 @@
  * طبقة الإجراءات الخادومية المحصنة بمعمارية Zero-Trust:
  *   ١. توليد contextId موحد في بداية كل حركة
  *   ٢. التحقق من الصلاحيات عبر enforceAdminPolicy داخل Server Action
- *   ٣. تسجيل الحدث في طابور التدقيق (غير حاجب)
- *   ٤. إرجاع payload صغير ورشيق للواجهة (Lightweight Response)
+ *   ③. تسجيل الحدث في طابور التدقيق (غير حاجب)
+ *   ④. إرجاع payload صغير ورشيق للواجهة (Lightweight Response)
  *
  * ✅ تحقق حقيقي من كلمات المرور عبر bcrypt
- * ✅ حفظ المستخدمين في قاعدة بيانات Prisma
+ * ✅ حفظ المستخدمين في قاعدة بيانات Supabase عبر REST API
  * ✅ حالة اشتراك PENDING افتراضياً حتى موافقة المدير
  * ═══════════════════════════════════════════════════════════════════════
  */
@@ -174,12 +174,12 @@ export async function getBaselineLockStatusAction(): Promise<{
 }
 
 /**
- * إجراء تسجيل مستخدم جديد — ✅ حفظ حقيقي في قاعدة البيانات
+ * إجراء تسجيل مستخدم جديد — ✅ حفظ حقيقي في قاعدة البيانات عبر Supabase REST API
  *
  * التدفق الكامل:
  *   ١. التحقق من المدخلات عبر Zod
- *   ٢. التحقق من عدم تكرار البريد الإلكتروني
- *   ٣. تشفير كلمة المرور عبر bcrypt
+ *   ②. التحقق من عدم تكرار البريد الإلكتروني
+ *   ③. تشفير كلمة المرور عبر bcrypt
  *   ④. حفظ المستخدم في قاعدة البيانات بحالة PENDING
  *   ⑤. إنشاء الجلسة المشفرة
  *   ⑥. تسجيل الحدث في طابور التدقيق
@@ -231,7 +231,7 @@ export async function registerAction(formData: FormData): Promise<{
     // ✅ التحقق من عدم تكرار البريد الإلكتروني
     const existingUser = await prisma.user.findUnique({
       where: { email: validatedData.email },
-    });
+    }) as any;
 
     if (existingUser) {
       return { success: false, contextId, error: 'البريد الإلكتروني مسجل بالفعل — استخدم بريداً مختلفاً أو سجّل الدخول' };
@@ -252,7 +252,7 @@ export async function registerAction(formData: FormData): Promise<{
         subscriptionStatus: 'PENDING',
         permissions: [],
       },
-    });
+    }) as any;
 
     // إنشاء الجلسة المشفرة
     const session = createUserSession({
@@ -283,6 +283,7 @@ export async function registerAction(formData: FormData): Promise<{
     return { success: true, contextId };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'خطأ غير معروف';
+    console.error('[AuthActions] Register error:', message);
 
     dispatchToAuditQueue({
       contextId,
@@ -298,14 +299,16 @@ export async function registerAction(formData: FormData): Promise<{
 }
 
 /**
- * إجراء تسجيل الدخول — ✅ تحقق حقيقي من كلمة المرور
+ * إجراء تسجيل الدخول — ✅ تحقق حقيقي من كلمة المرور عبر Supabase REST API
  *
  * التدفق الكامل:
  *   ١. التحقق من المدخلات عبر Zod
- *   ٢. البحث عن المستخدم في قاعدة البيانات
+ *   ②. البحث عن المستخدم في قاعدة البيانات
  *   ③. التحقق من كلمة المرور عبر bcrypt
  *   ④. التحقق من حالة الاشتراك
  *   ⑤. إنشاء الجلسة المشفرة
+ *   ⑥. زرع كوكي الجلسة
+ *   ⑦. إعادة التوجيه إلى لوحة التحكم
  */
 export async function loginAction(formData: FormData): Promise<{
   success: boolean;
@@ -320,6 +323,8 @@ export async function loginAction(formData: FormData): Promise<{
       email: formData.get('email') as string,
       password: formData.get('password') as string,
     };
+
+    console.log(`[AuthActions] Login attempt for: ${rawData.email}`);
 
     const validationResult = LoginSchema.safeParse(rawData);
 
@@ -336,10 +341,12 @@ export async function loginAction(formData: FormData): Promise<{
       return { success: false, contextId, error: 'بيانات الدخول غير صالحة' };
     }
 
-    // ✅ البحث عن المستخدم في قاعدة البيانات
+    // ✅ البحث عن المستخدم في قاعدة البيانات عبر Supabase REST API
     const user = await prisma.user.findUnique({
       where: { email: validationResult.data.email },
-    });
+    }) as any;
+
+    console.log(`[AuthActions] User found:`, user ? `id=${user.id}, role=${user.role}` : 'NOT FOUND');
 
     if (!user) {
       dispatchToAuditQueue({
@@ -356,6 +363,8 @@ export async function loginAction(formData: FormData): Promise<{
 
     // ✅ التحقق من كلمة المرور عبر bcrypt
     const isPasswordValid = await verifyPassword(validationResult.data.password, user.passwordHash);
+
+    console.log(`[AuthActions] Password valid: ${isPasswordValid}`);
 
     if (!isPasswordValid) {
       dispatchToAuditQueue({
@@ -409,6 +418,8 @@ export async function loginAction(formData: FormData): Promise<{
 
     await setSessionCookie(session);
 
+    console.log(`[AuthActions] Session created and cookie set for: ${user.email}`);
+
     dispatchToAuditQueue({
       contextId,
       event: AUDIT_EVENTS.LOGIN,
@@ -421,6 +432,7 @@ export async function loginAction(formData: FormData): Promise<{
     return { success: true, contextId, subscriptionStatus: user.subscriptionStatus };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'خطأ غير معروف';
+    console.error('[AuthActions] Login error:', message);
 
     dispatchToAuditQueue({
       contextId,
@@ -431,7 +443,7 @@ export async function loginAction(formData: FormData): Promise<{
       description: `خطأ غير متوقع في تسجيل الدخول: ${message}`,
     });
 
-    return { success: false, contextId, error: 'حدث خطأ أثناء تسجيل الدخول' };
+    return { success: false, contextId, error: `حدث خطأ أثناء تسجيل الدخول: ${message}` };
   }
 }
 

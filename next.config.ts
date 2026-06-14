@@ -1,14 +1,13 @@
 // ═══════════════════════════════════════════════════════════════════════
-// إعدادات Next.js مع Serwist PWA - next.config.ts
+// إعدادات Next.js — Netlify Deployment
 // منصة المدقق الديناميكي الموحد V3.0
-// @serwist/next: الخليفة الحديث والمستقر لـ Workbox في بيئة App Router
 // ═══════════════════════════════════════════════════════════════════════
 
 import type { NextConfig } from "next";
-import withSerwist from "@serwist/next";
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  // ❌ لا تستخدم output: "standalone" مع Netlify
+  // Netlify يدير البناء والنشر بنفسه
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -17,11 +16,4 @@ const nextConfig: NextConfig = {
   turbopack: {},
 };
 
-export default withSerwist({
-  swSrc: "src/sw.ts",
-  swDest: "public/sw.js",
-  cacheOnNavigation: true,
-  reloadOnOnline: true,
-  // تعطيل Serwist في وضع التطوير لتجنب تعارض Turbopack
-  disable: process.env.NODE_ENV === "development",
-})(nextConfig);
+export default nextConfig;

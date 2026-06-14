@@ -1,13 +1,10 @@
-import { PrismaClient } from '@prisma/client'
+/**
+ * ═══════════════════════════════════════════════════════════════════════
+ * 🔌 عميل قاعدة البيانات الموحد — Database Client
+ * ═══════════════════════════════════════════════════════════════════════
+ *
+ * تصدير موحد لعميل قاعدة البيانات عبر Supabase REST API
+ * ═══════════════════════════════════════════════════════════════════════
+ */
 
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined
-}
-
-export const db =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log: ['query'],
-  })
-
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db
+export { supabaseDb as db } from './db/supabase-adapter';
