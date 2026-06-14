@@ -55,3 +55,28 @@ Stage Summary:
 - حماية مسارات عبر middleware
 - بذر حساب المدير الافتراضي (أبو سليمان)
 - Build ناجح بدون أخطاء
+---
+Task ID: 1
+Agent: Main Agent
+Task: إصلاح خلل تسجيل الدخول على Netlify - تحليل عمق وإصلاح شامل
+
+Work Log:
+- قراءة وتحليل جميع ملفات المصادقة: auth.actions.ts, login-form.tsx, session.ts, crypto-vault.ts, password.ts, middleware/proxy.ts, prisma.ts
+- تحديد 5 أعطال رئيسية في مسار تسجيل الدخول
+- إنشاء Supabase REST API adapter جديد (supabase-adapter.ts) بديل كامل لـ PrismaClient
+- تحديث prisma.ts و db.ts لاستخدام Supabase adapter
+- إصلاح next.config.ts: إزالة output: "standalone" و withSerwist
+- إصلاح crypto-vault.ts: التحقق من طول ENCRYPTION_KEY + رسائل خطأ أوضح
+- تحديث session.ts: sameSite='lax' بدلاً من 'strict' لمنع مشاكل redirect
+- تحويل middleware.ts → proxy.ts مع export function proxy() (Next.js 16 convention)
+- إصلاح صفحة الجذر: عرض قائمة رئيسية بدلاً من redirect
+- تحديث Netlify build command من "npx prisma generate && npx prisma migrate deploy && npx next build" إلى "npx next build"
+- البناء الناجح محلياً وعلى Netlify (74 ثانية)
+- اختبار شامل: Supabase REST API يعمل، bcrypt يعمل، AES-256-GCM يعمل، proxy يعمل
+
+Stage Summary:
+- الموقع: https://structural-blast-auditor.netlify.app/
+- صفحة تسجيل الدخول: /auth/login (200 OK)
+- الـ proxy يعمل: /dashboard → redirect إلى /auth/login (307)
+- المستخدم المدير: abu-sulaiman@structural-blast.sy / Admin@2024
+- جميع المكونات تعمل: REST API, bcrypt, crypto, proxy
