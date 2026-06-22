@@ -1,0 +1,761 @@
+     1→     1→// ═══════════════════════════════════════════════════════════════════════
+     2→     2→// صفحة المفاضلة الهندسية — مقارنة RECTANGULAR / CIRCULAR / ARCHED
+     3→     3→// منصة المدقق الديناميكي الموحد V3.0
+     4→     4→// RTL Arabic + Dark Theme + shadcn/ui
+     5→     5→// ═══════════════════════════════════════════════════════════════════════
+     6→     6→
+     7→     7→'use client';
+     8→     8→
+     9→     9→import React, { useEffect, useState, useMemo } from 'react';
+    10→    10→import {
+    11→    11→  Card,
+    12→    12→  CardContent,
+    13→    13→  CardHeader,
+    14→    14→  CardTitle,
+    15→    15→  CardDescription,
+    16→    16→} from '@/components/ui/card';
+    17→    17→import {
+    18→    18→  Table,
+    19→    19→  TableBody,
+    20→    20→  TableCell,
+    21→    21→  TableHead,
+    22→    22→  TableHeader,
+    23→    23→  TableRow,
+    24→    24→} from '@/components/ui/table';
+    25→    25→import { Badge } from '@/components/ui/badge';
+    26→    26→import { Separator } from '@/components/ui/separator';
+    27→    27→import { Skeleton } from '@/components/ui/skeleton';
+    28→    28→import {
+    29→    29→  BarChart3,
+    30→    30→  Trophy,
+    31→    31→  CheckCircle2,
+    32→    32→  AlertTriangle,
+    33→    33→  XCircle,
+    34→    34→  Ruler,
+    35→    35→  Weight,
+    36→    36→  Cuboid,
+    37→    37→  Zap,
+    38→    38→  ShieldCheck,
+    39→    39→  Scale,
+    40→    40→  Info,
+    41→    41→} from 'lucide-react';
+    42→    42→import type {
+    43→    43→  GeometryType,
+    44→    44→  GeometryComparisonReport,
+    45→    45→  GeometryComparisonEntry,
+    46→    46→  ValidationStatus,
+    47→    47→  SectionDesignResult,
+    48→    48→} from '@/lib/engine/types';
+    49→    49→
+    50→    50→// ═══════════════════════════════════════════════════════════════════════
+    51→    51→// أنواع استجابة API
+    52→    52→// ═══════════════════════════════════════════════════════════════════════
+    53→    53→
+    54→    54→interface ComparisonWeightsDTO {
+    55→    55→  thicknessWeight: number;
+    56→    56→  steelWeight: number;
+    57→    57→  safetyWeight: number;
+    58→    58→  ductilityWeight: number;
+    59→    59→}
+    60→    60→
+    61→    61→interface ComparisonResponse {
+    62→    62→  comparison: GeometryComparisonReport;
+    63→    63→  structural: Record<GeometryType, SectionDesignResult>;
+    64→    64→  weights: ComparisonWeightsDTO;
+    65→    65→  designInputs: {
+    66→    66→    pDesignMpa: number;
+    67→    67→    tunnelSpanShort: number;
+    68→    68→    tunnelSpanLong: number;
+    69→    69→    fcMpa: number;
+    70→    70→    fyMpa: number;
+    71→    71→  };
+    72→    72→}
+    73→    73→
+    74→    74→// ═══════════════════════════════════════════════════════════════════════
+    75→    75→// ثوابت محلية
+    76→    76→// ═══════════════════════════════════════════════════════════════════════
+    77→    77→
+    78→    78→const GEOMETRY_LABELS: Record<GeometryType, string> = {
+    79→    79→  RECTANGULAR: 'مستطيل',
+    80→    80→  CIRCULAR: 'دائري',
+    81→    81→  ARCHED: 'مقوّس',
+    82→    82→};
+    83→    83→
+    84→    84→const GEOMETRY_COLORS: Record<GeometryType, string> = {
+    85→    85→  RECTANGULAR: 'text-sky-400',
+    86→    86→  CIRCULAR: 'text-amber-400',
+    87→    87→  ARCHED: 'text-violet-400',
+    88→    88→};
+    89→    89→
+    90→    90→const GEOMETRY_BG: Record<GeometryType, string> = {
+    91→    91→  RECTANGULAR: 'bg-sky-500/10 border-sky-500/30',
+    92→    92→  CIRCULAR: 'bg-amber-500/10 border-amber-500/30',
+    93→    93→  ARCHED: 'bg-violet-500/10 border-violet-500/30',
+    94→    94→};
+    95→    95→
+    96→    96→const STATUS_CONFIG: Record<
+    97→    97→  ValidationStatus,
+    98→    98→  { label: string; icon: React.ReactNode; className: string }
+    99→    99→> = {
+   100→   100→  SUCCESS: {
+   101→   101→    label: 'آمن',
+   102→   102→    icon: <CheckCircle2 className="h-3.5 w-3.5" />,
+   103→   103→    className: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+   104→   104→  },
+   105→   105→  WARNING: {
+   106→   106→    label: 'تحذير',
+   107→   107→    icon: <AlertTriangle className="h-3.5 w-3.5" />,
+   108→   108→    className: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+   109→   109→  },
+   110→   110→  FAILURE: {
+   111→   111→    label: 'فشل',
+   112→   112→    icon: <XCircle className="h-3.5 w-3.5" />,
+   113→   113→    className: 'bg-red-500/15 text-red-400 border-red-500/30',
+   114→   114→  },
+   115→   115→};
+   116→   116→
+   117→   117→// ═══════════════════════════════════════════════════════════════════════
+   118→   118→// مكوّن شارة الحالة
+   119→   119→// ═══════════════════════════════════════════════════════════════════════
+   120→   120→
+   121→   121→function StatusBadge({ status }: { status: ValidationStatus }) {
+   122→   122→  const config = STATUS_CONFIG[status];
+   123→   123→  return (
+   124→   124→    <Badge
+   125→   125→      variant="outline"
+   126→   126→      className={`gap-1 px-2 py-0.5 text-xs font-medium ${config.className}`}
+   127→   127→    >
+   128→   128→      {config.icon}
+   129→   129→      {config.label}
+   130→   130→    </Badge>
+   131→   131→  );
+   132→   132→}
+   133→   133→
+   134→   134→// ═══════════════════════════════════════════════════════════════════════
+   135→   135→// مكوّن الرسوم الهندسية (SVG Cross-Sections)
+   136→   136→// ═══════════════════════════════════════════════════════════════════════
+   137→   137→
+   138→   138→function RectangularDiagram({ thickness, span }: { thickness: number; span: number }) {
+   139→   139→  const w = 160;
+   140→   140→  const h = 120;
+   141→   141→  const rectW = 110;
+   142→   142→  const rectH = Math.min(70, Math.max(30, thickness * 100));
+   143→   143→  const cx = w / 2;
+   144→   144→  const cy = h / 2;
+   145→   145→
+   146→   146→  return (
+   147→   147→    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="mx-auto">
+   148→   148→      {/* المستطيل */}
+   149→   149→      <rect
+   150→   150→        x={cx - rectW / 2}
+   151→   151→        y={cy - rectH / 2}
+   152→   152→        width={rectW}
+   153→   153→        height={rectH}
+   154→   154→        fill="none"
+   155→   155→        stroke="#38bdf8"
+   156→   156→        strokeWidth="2"
+   157→   157→        rx="2"
+   158→   158→      />
+   159→   159→      {/* سهم السماكة */}
+   160→   160→      <line
+   161→   161→        x1={cx + rectW / 2 + 8}
+   162→   162→        y1={cy - rectH / 2}
+   163→   163→        x2={cx + rectW / 2 + 8}
+   164→   164→        y2={cy + rectH / 2}
+   165→   165→        stroke="#94a3b8"
+   166→   166→        strokeWidth="1"
+   167→   167→        strokeDasharray="3 2"
+   168→   168→      />
+   169→   169→      <text x={cx + rectW / 2 + 14} y={cy + 4} fill="#94a3b8" fontSize="9" textAnchor="start">
+   170→   170→        h={thickness.toFixed(2)}m
+   171→   171→      </text>
+   172→   172→      {/* سهم البحر */}
+   173→   173→      <line
+   174→   174→        x1={cx - rectW / 2}
+   175→   175→        y1={cy + rectH / 2 + 10}
+   176→   176→        x2={cx + rectW / 2}
+   177→   177→        y2={cy + rectH / 2 + 10}
+   178→   178→        stroke="#94a3b8"
+   179→   179→        strokeWidth="1"
+   180→   180→        strokeDasharray="3 2"
+   181→   181→      />
+   182→   182→      <text x={cx} y={cy + rectH / 2 + 22} fill="#94a3b8" fontSize="9" textAnchor="middle">
+   183→   183→        L={span.toFixed(1)}m
+   184→   184→      </text>
+   185→   185→    </svg>
+   186→   186→  );
+   187→   187→}
+   188→   188→
+   189→   189→function CircularDiagram({ thickness, span }: { thickness: number; span: number }) {
+   190→   190→  const w = 160;
+   191→   191→  const h = 120;
+   192→   192→  const cx = w / 2;
+   193→   193→  const cy = h / 2;
+   194→   194→  const outerR = Math.min(45, Math.max(20, span * 12));
+   195→   195→  const innerR = outerR - Math.min(12, Math.max(4, thickness * 30));
+   196→   196→
+   197→   197→  return (
+   198→   198→    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="mx-auto">
+   199→   199→      {/* الدائرة الخارجية */}
+   200→   200→      <circle cx={cx} cy={cy} r={outerR} fill="none" stroke="#fbbf24" strokeWidth="2" />
+   201→   201→      {/* الدائرة الداخلية */}
+   202→   202→      <circle cx={cx} cy={cy} r={innerR} fill="none" stroke="#fbbf24" strokeWidth="1.5" strokeDasharray="4 3" />
+   203→   203→      {/* سهم السماكة */}
+   204→   204→      <line x1={cx} y1={cy} x2={cx + innerR} y2={cy} stroke="#94a3b8" strokeWidth="1" strokeDasharray="3 2" />
+   205→   205→      <line x1={cx + innerR} y1={cy} x2={cx + outerR} y2={cy} stroke="#94a3b8" strokeWidth="1.5" />
+   206→   206→      <text x={cx + (innerR + outerR) / 2} y={cy - 6} fill="#94a3b8" fontSize="9" textAnchor="middle">
+   207→   207→        h={thickness.toFixed(2)}m
+   208→   208→      </text>
+   209→   209→      {/* سهم القطر */}
+   210→   210→      <line x1={cx - outerR} y1={cy + outerR + 8} x2={cx + outerR} y2={cy + outerR + 8} stroke="#94a3b8" strokeWidth="1" strokeDasharray="3 2" />
+   211→   211→      <text x={cx} y={cy + outerR + 20} fill="#94a3b8" fontSize="9" textAnchor="middle">
+   212→   212→        D={span.toFixed(1)}m
+   213→   213→      </text>
+   214→   214→    </svg>
+   215→   215→  );
+   216→   216→}
+   217→   217→
+   218→   218→function ArchedDiagram({ thickness, span }: { thickness: number; span: number }) {
+   219→   219→  const w = 160;
+   220→   220→  const h = 130;
+   221→   221→  const cx = w / 2;
+   222→   222→  const baseY = 80;
+   223→   223→  const rectW = 110;
+   224→   224→  const rectH = Math.min(45, Math.max(20, thickness * 60));
+   225→   225→  const archR = rectW / 2;
+   226→   226→
+   227→   227→  return (
+   228→   228→    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="mx-auto">
+   229→   229→      {/* الجدران الجانبية */}
+   230→   230→      <line x1={cx - rectW / 2} y1={baseY} x2={cx - rectW / 2} y2={baseY - rectH} stroke="#a78bfa" strokeWidth="2" />
+   231→   231→      <line x1={cx + rectW / 2} y1={baseY} x2={cx + rectW / 2} y2={baseY - rectH} stroke="#a78bfa" strokeWidth="2" />
+   232→   232→      {/* الأرضية */}
+   233→   233→      <line x1={cx - rectW / 2} y1={baseY} x2={cx + rectW / 2} y2={baseY} stroke="#a78bfa" strokeWidth="2" />
+   234→   234→      {/* القوس */}
+   235→   235→      <path
+   236→   236→        d={`M ${cx - rectW / 2} ${baseY - rectH} A ${archR} ${archR * 0.6} 0 0 1 ${cx + rectW / 2} ${baseY - rectH}`}
+   237→   237→        fill="none"
+   238→   238→        stroke="#a78bfa"
+   239→   239→        strokeWidth="2"
+   240→   240→      />
+   241→   241→      {/* سهم السماكة */}
+   242→   242→      <line x1={cx + rectW / 2 + 8} y1={baseY} x2={cx + rectW / 2 + 8} y2={baseY - rectH} stroke="#94a3b8" strokeWidth="1" strokeDasharray="3 2" />
+   243→   243→      <text x={cx + rectW / 2 + 14} y={baseY - rectH / 2 + 4} fill="#94a3b8" fontSize="9" textAnchor="start">
+   244→   244→        h={thickness.toFixed(2)}m
+   245→   245→      </text>
+   246→   246→      {/* سهم البحر */}
+   247→   247→      <line x1={cx - rectW / 2} y1={baseY + 10} x2={cx + rectW / 2} y2={baseY + 10} stroke="#94a3b8" strokeWidth="1" strokeDasharray="3 2" />
+   248→   248→      <text x={cx} y={baseY + 22} fill="#94a3b8" fontSize="9" textAnchor="middle">
+   249→   249→        L={span.toFixed(1)}m
+   250→   250→      </text>
+   251→   251→    </svg>
+   252→   252→  );
+   253→   253→}
+   254→   254→
+   255→   255→// ═══════════════════════════════════════════════════════════════════════
+   256→   256→// مُحمّل هيكلي
+   257→   257→// ═══════════════════════════════════════════════════════════════════════
+   258→   258→
+   259→   259→function ComparisonSkeleton() {
+   260→   260→  return (
+   261→   261→    <div className="space-y-6">
+   262→   262→      <div className="flex items-center gap-3">
+   263→   263→        <Skeleton className="h-8 w-8 rounded-lg" />
+   264→   264→        <Skeleton className="h-8 w-48" />
+   265→   265→      </div>
+   266→   266→      <Skeleton className="h-64 w-full rounded-xl" />
+   267→   267→      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+   268→   268→        {[1, 2, 3].map((i) => (
+   269→   269→          <Skeleton key={i} className="h-48 rounded-xl" />
+   270→   270→        ))}
+   271→   271→      </div>
+   272→   272→      <Skeleton className="h-40 w-full rounded-xl" />
+   273→   273→    </div>
+   274→   274→  );
+   275→   275→}
+   276→   276→
+   277→   277→// ═══════════════════════════════════════════════════════════════════════
+   278→   278→// الصفحة الرئيسية
+   279→   279→// ═══════════════════════════════════════════════════════════════════════
+   280→   280→
+   281→   281→export default function ComparisonPage() {
+   282→   282→  const [data, setData] = useState<ComparisonResponse | null>(null);
+   283→   283→  const [loading, setLoading] = useState(true);
+   284→   284→  const [error, setError] = useState<string | null>(null);
+   285→   285→
+   286→   286→  useEffect(() => {
+   287→   287→    async function fetchData() {
+   288→   288→      try {
+   289→   289→        setLoading(true);
+   290→   290→        const res = await fetch('/api/comparison');
+   291→   291→        if (!res.ok) throw new Error(`خطأ في الخادم: ${res.status}`);
+   292→   292→        const json: ComparisonResponse = await res.json();
+   293→   293→        setData(json);
+   294→   294→      } catch (err) {
+   295→   295→        setError(err instanceof Error ? err.message : 'خطأ غير معروف');
+   296→   296→      } finally {
+   297→   297→        setLoading(false);
+   298→   298→      }
+   299→   299→    }
+   300→   300→    fetchData();
+   301→   301→  }, []);
+   302→   302→
+   303→   303→  // ─── أفضل قيمة لكل معيار ───
+   304→   304→  const bestValues = useMemo(() => {
+   305→   305→    if (!data) return null;
+   306→   306→    const m = data.comparison.comparisonMatrix;
+   307→   307→    const geos: GeometryType[] = ['RECTANGULAR', 'CIRCULAR', 'ARCHED'];
+   308→   308→
+   309→   309→    return {
+   310→   310→      thicknessMeters: geos.reduce((best, g) =>
+   311→   311→        m[g].thicknessMeters < m[best].thicknessMeters ? g : best
+   312→   312→      ),
+   313→   313→      steelWeightTon: geos.reduce((best, g) =>
+   314→   314→        m[g].steelWeightTon < m[best].steelWeightTon ? g : best
+   315→   315→      ),
+   316→   316→      concreteVolumeM3: geos.reduce((best, g) =>
+   317→   317→        m[g].concreteVolumeM3 < m[best].concreteVolumeM3 ? g : best
+   318→   318→      ),
+   319→   319→      maxDynamicMomentKnM: geos.reduce((best, g) =>
+   320→   320→        m[g].maxDynamicMomentKnM > m[best].maxDynamicMomentKnM ? g : best
+   321→   321→      ),
+   322→   322→    };
+   323→   323→  }, [data]);
+   324→   324→
+   325→   325→  // ─── صفوف الجدول ───
+   326→   326→  const tableRows = useMemo(() => {
+   327→   327→    if (!data) return [];
+   328→   328→    const m = data.comparison.comparisonMatrix;
+   329→   329→
+   330→   330→    return [
+   331→   331→      {
+   332→   332→        criterion: 'السماكة المطلوبة (m)',
+   333→   333→        icon: <Ruler className="h-4 w-4 text-slate-400" />,
+   334→   334→        key: 'thicknessMeters' as const,
+   335→   335→        format: (v: number) => v.toFixed(3),
+   336→   336→        best: bestValues?.thicknessMeters,
+   337→   337→        lowerBetter: true,
+   338→   338→      },
+   339→   339→      {
+   340→   340→        criterion: 'وزن الحديد (طن)',
+   341→   341→        icon: <Weight className="h-4 w-4 text-slate-400" />,
+   342→   342→        key: 'steelWeightTon' as const,
+   343→   343→        format: (v: number) => v.toFixed(2),
+   344→   344→        best: bestValues?.steelWeightTon,
+   345→   345→        lowerBetter: true,
+   346→   346→      },
+   347→   347→      {
+   348→   348→        criterion: 'حجم الخرسانة (m³)',
+   349→   349→        icon: <Cuboid className="h-4 w-4 text-slate-400" />,
+   350→   350→        key: 'concreteVolumeM3' as const,
+   351→   351→        format: (v: number) => v.toFixed(2),
+   352→   352→        best: bestValues?.concreteVolumeM3,
+   353→   353→        lowerBetter: true,
+   354→   354→      },
+   355→   355→      {
+   356→   356→        criterion: 'العزم الديناميكي (kN.m)',
+   357→   357→        icon: <Zap className="h-4 w-4 text-slate-400" />,
+   358→   358→        key: 'maxDynamicMomentKnM' as const,
+   359→   359→        format: (v: number) => v.toFixed(1),
+   360→   360→        best: bestValues?.maxDynamicMomentKnM,
+   361→   361→        lowerBetter: false,
+   362→   362→      },
+   363→   363→    ];
+   364→   364→  }, [data, bestValues]);
+   365→   365→
+   366→   366→  if (loading) return <ComparisonSkeleton />;
+   367→   367→
+   368→   368→  if (error) {
+   369→   369→    return (
+   370→   370→      <div className="flex items-center justify-center min-h-[60vh]">
+   371→   371→        <Card className="w-full max-w-md border-red-500/30 bg-red-500/5">
+   372→   372→          <CardContent className="p-6 text-center">
+   373→   373→            <XCircle className="h-10 w-10 text-red-400 mx-auto mb-3" />
+   374→   374→            <p className="text-red-400 font-medium">خطأ في تحميل البيانات</p>
+   375→   375→            <p className="text-sm text-slate-500 mt-2">{error}</p>
+   376→   376→          </CardContent>
+   377→   377→        </Card>
+   378→   378→      </div>
+   379→   379→    );
+   380→   380→  }
+   381→   381→
+   382→   382→  if (!data) return null;
+   383→   383→
+   384→   384→  const { comparison, structural, weights, designInputs } = data;
+   385→   385→  const { comparisonMatrix, recommendedGeometry, explanation } = comparison;
+   386→   386→  const geos: GeometryType[] = ['RECTANGULAR', 'CIRCULAR', 'ARCHED'];
+   387→   387→
+   388→   388→  return (
+   389→   389→    <div className="space-y-6" dir="rtl">
+   390→   390→      {/* ═══════════════ 1. الرأس ═══════════════ */}
+   391→   391→      <div className="flex items-center gap-3">
+   392→   392→        <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+   393→   393→          <BarChart3 className="h-5 w-5 text-emerald-400" />
+   394→   394→        </div>
+   395→   395→        <div>
+   396→   396→          <h1 className="text-xl font-bold text-slate-100">المفاضلة الهندسية</h1>
+   397→   397→          <p className="text-sm text-slate-500">
+   398→   398→            مقارنة الأشكال الإنشائية الثلاثة — المرجع BMK-02
+   399→   399→          </p>
+   400→   400→        </div>
+   401→   401→      </div>
+   402→   402→
+   403→   403→      {/* ═══════════════ 2. جدول المقارنة ═══════════════ */}
+   404→   404→      <Card className="border-slate-800/60 bg-slate-900/50">
+   405→   405→        <CardHeader className="pb-3">
+   406→   406→          <CardTitle className="text-base font-semibold text-slate-200 flex items-center gap-2">
+   407→   407→            <Scale className="h-4 w-4 text-emerald-400" />
+   408→   408→            مصفوفة المقارنة
+   409→   409→          </CardTitle>
+   410→   410→          <CardDescription className="text-slate-500 text-xs">
+   411→   411→            القيم المُبرزة بالأخضر هي الأفضل لكل معيار
+   412→   412→          </CardDescription>
+   413→   413→        </CardHeader>
+   414→   414→        <CardContent className="p-0">
+   415→   415→          <div className="overflow-x-auto">
+   416→   416→            <Table>
+   417→   417→              <TableHeader>
+   418→   418→                <TableRow className="border-slate-800/60 hover:bg-transparent">
+   419→   419→                  <TableHead className="text-slate-400 font-medium text-xs w-[180px]">
+   420→   420→                    المعيار
+   421→   421→                  </TableHead>
+   422→   422→                  {geos.map((geo) => (
+   423→   423→                    <TableHead
+   424→   424→                      key={geo}
+   425→   425→                      className={`text-center font-semibold text-xs ${GEOMETRY_COLORS[geo]}`}
+   426→   426→                    >
+   427→   427→                      {GEOMETRY_LABELS[geo]}
+   428→   428→                      {geo === recommendedGeometry && (
+   429→   429→                        <Trophy className="h-3 w-3 inline-block mr-1 text-emerald-400" />
+   430→   430→                      )}
+   431→   431→                    </TableHead>
+   432→   432→                  ))}
+   433→   433→                </TableRow>
+   434→   434→              </TableHeader>
+   435→   435→              <TableBody>
+   436→   436→                {tableRows.map((row) => (
+   437→   437→                  <TableRow
+   438→   438→                    key={row.key}
+   439→   439→                    className="border-slate-800/40 hover:bg-slate-800/20"
+   440→   440→                  >
+   441→   441→                    <TableCell className="text-slate-300 text-sm font-medium flex items-center gap-2">
+   442→   442→                      {row.icon}
+   443→   443→                      {row.criterion}
+   444→   444→                    </TableCell>
+   445→   445→                    {geos.map((geo) => {
+   446→   446→                      const value = comparisonMatrix[geo][row.key];
+   447→   447→                      const isBest = row.best === geo;
+   448→   448→                      return (
+   449→   449→                        <TableCell
+   450→   450→                          key={geo}
+   451→   451→                          className={`text-center text-sm tabular-nums ${
+   452→   452→                            isBest
+   453→   453→                              ? 'text-emerald-400 font-semibold'
+   454→   454→                              : 'text-slate-400'
+   455→   455→                          }`}
+   456→   456→                        >
+   457→   457→                          {row.format(value)}
+   458→   458→                          {isBest && (
+   459→   459→                            <span className="text-emerald-500 text-[10px] mr-1">✓</span>
+   460→   460→                          )}
+   461→   461→                        </TableCell>
+   462→   462→                      );
+   463→   463→                    })}
+   464→   464→                  </TableRow>
+   465→   465→                ))}
+   466→   466→
+   467→   467→                {/* ─── صف حالة الأمان ─── */}
+   468→   468→                <TableRow className="border-slate-800/40 hover:bg-slate-800/20">
+   469→   469→                  <TableCell className="text-slate-300 text-sm font-medium flex items-center gap-2">
+   470→   470→                    <ShieldCheck className="h-4 w-4 text-slate-400" />
+   471→   471→                    حالة الأمان
+   472→   472→                  </TableCell>
+   473→   473→                  {geos.map((geo) => (
+   474→   474→                    <TableCell key={geo} className="text-center">
+   475→   475→                      <StatusBadge status={comparisonMatrix[geo].safetyStatus} />
+   476→   476→                    </TableCell>
+   477→   477→                  ))}
+   478→   478→                </TableRow>
+   479→   479→              </TableBody>
+   480→   480→            </Table>
+   481→   481→          </div>
+   482→   482→        </CardContent>
+   483→   483→      </Card>
+   484→   484→
+   485→   485→      {/* ═══════════════ 3. بطاقة التوصية ═══════════════ */}
+   486→   486→      <Card className="border-emerald-500/40 bg-emerald-500/5 ring-1 ring-emerald-500/20">
+   487→   487→        <CardHeader className="pb-3">
+   488→   488→          <div className="flex items-center gap-2">
+   489→   489→            <Trophy className="h-5 w-5 text-emerald-400" />
+   490→   490→            <CardTitle className="text-base font-bold text-emerald-300">
+   491→   491→              الشكل المُوصى به: {GEOMETRY_LABELS[recommendedGeometry]}
+   492→   492→            </CardTitle>
+   493→   493→          </div>
+   494→   494→        </CardHeader>
+   495→   495→        <CardContent>
+   496→   496→          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+   497→   497→            {/* التفسير */}
+   498→   498→            <div className="space-y-2">
+   499→   499→              <p className="text-sm text-slate-300 leading-relaxed">{explanation}</p>
+   500→   500→              <Separator className="bg-emerald-500/20" />
+   501→   501→              <div className="flex flex-wrap gap-3 text-xs text-slate-400">
+   502→   502→                <span className="flex items-center gap-1">
+   503→   503→                  <Ruler className="h-3 w-3" />
+   504→   504→                  سماكة: {comparisonMatrix[recommendedGeometry].thicknessMeters.toFixed(3)}m
+   505→   505→                </span>
+   506→   506→                <span className="flex items-center gap-1">
+   507→   507→                  <Weight className="h-3 w-3" />
+   508→   508→                  حديد: {comparisonMatrix[recommendedGeometry].steelWeightTon.toFixed(2)} طن
+   509→   509→                </span>
+   510→   510→                <span className="flex items-center gap-1">
+   511→   511→                  <Cuboid className="h-3 w-3" />
+   512→   512→                  خرسانة: {comparisonMatrix[recommendedGeometry].concreteVolumeM3.toFixed(2)}m³
+   513→   513→                </span>
+   514→   514→              </div>
+   515→   515→            </div>
+   516→   516→
+   517→   517→            {/* ملخص درجات كل شكل */}
+   518→   518→            <div className="space-y-2">
+   519→   519→              <p className="text-xs font-medium text-slate-400 mb-2">ملخص التقييم:</p>
+   520→   520→              {geos.map((geo) => {
+   521→   521→                const entry = comparisonMatrix[geo];
+   522→   522→                const isRecommended = geo === recommendedGeometry;
+   523→   523→                return (
+   524→   524→                  <div
+   525→   525→                    key={geo}
+   526→   526→                    className={`flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-sm ${
+   527→   527→                      isRecommended
+   528→   528→                        ? 'bg-emerald-500/10 border border-emerald-500/30'
+   529→   529→                        : 'bg-slate-800/30 border border-slate-800/40'
+   530→   530→                    }`}
+   531→   531→                  >
+   532→   532→                    <div className="flex items-center gap-2">
+   533→   533→                      <span className={`font-medium ${GEOMETRY_COLORS[geo]}`}>
+   534→   534→                        {GEOMETRY_LABELS[geo]}
+   535→   535→                      </span>
+   536→   536→                      {isRecommended && (
+   537→   537→                        <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[10px] px-1.5">
+   538→   538→                          موصى
+   539→   539→                        </Badge>
+   540→   540→                      )}
+   541→   541→                    </div>
+   542→   542→                    <StatusBadge status={entry.safetyStatus} />
+   543→   543→                  </div>
+   544→   544→                );
+   545→   545→              })}
+   546→   546→            </div>
+   547→   547→          </div>
+   548→   548→        </CardContent>
+   549→   549→      </Card>
+   550→   550→
+   551→   551→      {/* ═══════════════ 4. الأشكال الهندسية البصرية ═══════════════ */}
+   552→   552→      <Card className="border-slate-800/60 bg-slate-900/50">
+   553→   553→        <CardHeader className="pb-3">
+   554→   554→          <CardTitle className="text-base font-semibold text-slate-200 flex items-center gap-2">
+   555→   555→            <Ruler className="h-4 w-4 text-emerald-400" />
+   556→   556→            المقاطع العرضية
+   557→   557→          </CardTitle>
+   558→   558→          <CardDescription className="text-slate-500 text-xs">
+   559→   559→            الأبعاد الرئيسية لكل شكل هندسي
+   560→   560→          </CardDescription>
+   561→   561→        </CardHeader>
+   562→   562→        <CardContent>
+   563→   563→          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+   564→   564→            {/* مستطيل */}
+   565→   565→            <div
+   566→   566→              className={`flex flex-col items-center gap-3 p-4 rounded-xl border ${GEOMETRY_BG.RECTANGULAR} ${
+   567→   567→                recommendedGeometry === 'RECTANGULAR' ? 'ring-1 ring-emerald-500/30' : ''
+   568→   568→              }`}
+   569→   569→            >
+   570→   570→              <span className={`text-sm font-semibold ${GEOMETRY_COLORS.RECTANGULAR}`}>
+   571→   571→                مقطع مستطيل
+   572→   572→                {recommendedGeometry === 'RECTANGULAR' && (
+   573→   573→                  <Trophy className="h-3.5 w-3.5 inline mr-1 text-emerald-400" />
+   574→   574→                )}
+   575→   575→              </span>
+   576→   576→              <RectangularDiagram
+   577→   577→                thickness={comparisonMatrix.RECTANGULAR.thicknessMeters}
+   578→   578→                span={designInputs.tunnelSpanShort}
+   579→   579→              />
+   580→   580→              <div className="text-[11px] text-slate-500 text-center space-y-0.5">
+   581→   581→                <p>سماكة: {comparisonMatrix.RECTANGULAR.thicknessMeters.toFixed(3)}m</p>
+   582→   582→                <p>بحر: {designInputs.tunnelSpanShort}×{designInputs.tunnelSpanLong}m</p>
+   583→   583→              </div>
+   584→   584→            </div>
+   585→   585→
+   586→   586→            {/* دائري */}
+   587→   587→            <div
+   588→   588→              className={`flex flex-col items-center gap-3 p-4 rounded-xl border ${GEOMETRY_BG.CIRCULAR} ${
+   589→   589→                recommendedGeometry === 'CIRCULAR' ? 'ring-1 ring-emerald-500/30' : ''
+   590→   590→              }`}
+   591→   591→            >
+   592→   592→              <span className={`text-sm font-semibold ${GEOMETRY_COLORS.CIRCULAR}`}>
+   593→   593→                مقطع دائري
+   594→   594→                {recommendedGeometry === 'CIRCULAR' && (
+   595→   595→                  <Trophy className="h-3.5 w-3.5 inline mr-1 text-emerald-400" />
+   596→   596→                )}
+   597→   597→              </span>
+   598→   598→              <CircularDiagram
+   599→   599→                thickness={comparisonMatrix.CIRCULAR.thicknessMeters}
+   600→   600→                span={designInputs.tunnelSpanShort}
+   601→   601→              />
+   602→   602→              <div className="text-[11px] text-slate-500 text-center space-y-0.5">
+   603→   603→                <p>سماكة: {comparisonMatrix.CIRCULAR.thicknessMeters.toFixed(3)}m</p>
+   604→   604→                <p>قطر داخلي: {(designInputs.tunnelSpanShort * 0.8).toFixed(1)}m</p>
+   605→   605→              </div>
+   606→   606→            </div>
+   607→   607→
+   608→   608→            {/* مقوّس */}
+   609→   609→            <div
+   610→   610→              className={`flex flex-col items-center gap-3 p-4 rounded-xl border ${GEOMETRY_BG.ARCHED} ${
+   611→   611→                recommendedGeometry === 'ARCHED' ? 'ring-1 ring-emerald-500/30' : ''
+   612→   612→              }`}
+   613→   613→            >
+   614→   614→              <span className={`text-sm font-semibold ${GEOMETRY_COLORS.ARCHED}`}>
+   615→   615→                مقطع مقوّس
+   616→   616→                {recommendedGeometry === 'ARCHED' && (
+   617→   617→                  <Trophy className="h-3.5 w-3.5 inline mr-1 text-emerald-400" />
+   618→   618→                )}
+   619→   619→              </span>
+   620→   620→              <ArchedDiagram
+   621→   621→                thickness={comparisonMatrix.ARCHED.thicknessMeters}
+   622→   622→                span={designInputs.tunnelSpanShort}
+   623→   623→              />
+   624→   624→              <div className="text-[11px] text-slate-500 text-center space-y-0.5">
+   625→   625→                <p>سماكة: {comparisonMatrix.ARCHED.thicknessMeters.toFixed(3)}m</p>
+   626→   626→                <p>بحر: {designInputs.tunnelSpanShort}×{designInputs.tunnelSpanLong}m</p>
+   627→   627→              </div>
+   628→   628→            </div>
+   629→   629→          </div>
+   630→   630→        </CardContent>
+   631→   631→      </Card>
+   632→   632→
+   633→   633→      {/* ═══════════════ 5. معايير القرار (الأوزان) ═══════════════ */}
+   634→   634→      <Card className="border-slate-800/60 bg-slate-900/50">
+   635→   635→        <CardHeader className="pb-3">
+   636→   636→          <CardTitle className="text-base font-semibold text-slate-200 flex items-center gap-2">
+   637→   637→            <Scale className="h-4 w-4 text-emerald-400" />
+   638→   638→            معايير اتخاذ القرار
+   639→   639→          </CardTitle>
+   640→   640→          <CardDescription className="text-slate-500 text-xs">
+   641→   641→            أوزان الترجيح المستخدمة في حساب الدرجة الكلية
+   642→   642→          </CardDescription>
+   643→   643→        </CardHeader>
+   644→   644→        <CardContent>
+   645→   645→          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+   646→   646→            {/* وزن السماكة */}
+   647→   647→            <div className="p-4 rounded-xl bg-slate-800/30 border border-slate-800/40 space-y-3">
+   648→   648→              <div className="flex items-center justify-between">
+   649→   649→                <div className="flex items-center gap-2">
+   650→   650→                  <Ruler className="h-4 w-4 text-sky-400" />
+   651→   651→                  <span className="text-sm font-medium text-slate-300">السماكة</span>
+   652→   652→                </div>
+   653→   653→                <span className="text-lg font-bold text-sky-400">{weights.thicknessWeight}%</span>
+   654→   654→              </div>
+   655→   655→              <div className="w-full h-2 rounded-full bg-slate-700/50 overflow-hidden">
+   656→   656→                <div
+   657→   657→                  className="h-full rounded-full bg-sky-500/70 transition-all duration-500"
+   658→   658→                  style={{ width: `${weights.thicknessWeight}%` }}
+   659→   659→                />
+   660→   660→              </div>
+   661→   661→              <p className="text-[11px] text-slate-500">أخف = أفضل</p>
+   662→   662→            </div>
+   663→   663→
+   664→   664→            {/* وزن الحديد */}
+   665→   665→            <div className="p-4 rounded-xl bg-slate-800/30 border border-slate-800/40 space-y-3">
+   666→   666→              <div className="flex items-center justify-between">
+   667→   667→                <div className="flex items-center gap-2">
+   668→   668→                  <Weight className="h-4 w-4 text-amber-400" />
+   669→   669→                  <span className="text-sm font-medium text-slate-300">التسليح</span>
+   670→   670→                </div>
+   671→   671→                <span className="text-lg font-bold text-amber-400">{weights.steelWeight}%</span>
+   672→   672→              </div>
+   673→   673→              <div className="w-full h-2 rounded-full bg-slate-700/50 overflow-hidden">
+   674→   674→                <div
+   675→   675→                  className="h-full rounded-full bg-amber-500/70 transition-all duration-500"
+   676→   676→                  style={{ width: `${weights.steelWeight}%` }}
+   677→   677→                />
+   678→   678→              </div>
+   679→   679→              <p className="text-[11px] text-slate-500">أقل = أفضل</p>
+   680→   680→            </div>
+   681→   681→
+   682→   682→            {/* وزن الأمان */}
+   683→   683→            <div className="p-4 rounded-xl bg-slate-800/30 border border-slate-800/40 space-y-3">
+   684→   684→              <div className="flex items-center justify-between">
+   685→   685→                <div className="flex items-center gap-2">
+   686→   686→                  <ShieldCheck className="h-4 w-4 text-emerald-400" />
+   687→   687→                  <span className="text-sm font-medium text-slate-300">الأمان</span>
+   688→   688→                </div>
+   689→   689→                <span className="text-lg font-bold text-emerald-400">{weights.safetyWeight}%</span>
+   690→   690→              </div>
+   691→   691→              <div className="w-full h-2 rounded-full bg-slate-700/50 overflow-hidden">
+   692→   692→                <div
+   693→   693→                  className="h-full rounded-full bg-emerald-500/70 transition-all duration-500"
+   694→   694→                  style={{ width: `${weights.safetyWeight}%` }}
+   695→   695→                />
+   696→   696→              </div>
+   697→   697→              <p className="text-[11px] text-slate-500">SUCCESS = أعلى درجة</p>
+   698→   698→            </div>
+   699→   699→
+   700→   700→            {/* وزن المطاوعة */}
+   701→   701→            <div className="p-4 rounded-xl bg-slate-800/30 border border-slate-800/40 space-y-3">
+   702→   702→              <div className="flex items-center justify-between">
+   703→   703→                <div className="flex items-center gap-2">
+   704→   704→                  <Zap className="h-4 w-4 text-violet-400" />
+   705→   705→                  <span className="text-sm font-medium text-slate-300">المطاوعة</span>
+   706→   706→                </div>
+   707→   707→                <span className="text-lg font-bold text-violet-400">{weights.ductilityWeight}%</span>
+   708→   708→              </div>
+   709→   709→              <div className="w-full h-2 rounded-full bg-slate-700/50 overflow-hidden">
+   710→   710→                <div
+   711→   711→                  className="h-full rounded-full bg-violet-500/70 transition-all duration-500"
+   712→   712→                  style={{ width: `${weights.ductilityWeight}%` }}
+   713→   713→                />
+   714→   714→              </div>
+   715→   715→              <p className="text-[11px] text-slate-500">أعلى = أفضل</p>
+   716→   716→            </div>
+   717→   717→          </div>
+   718→   718→
+   719→   719→          {/* ملاحظة */}
+   720→   720→          <div className="mt-4 flex items-start gap-2 p-3 rounded-lg bg-slate-800/20 border border-slate-800/30">
+   721→   721→            <Info className="h-4 w-4 text-slate-500 mt-0.5 shrink-0" />
+   722→   722→            <p className="text-xs text-slate-500 leading-relaxed">
+   723→   723→              الدرجة الكلية = (درجة السماكة × {weights.thicknessWeight}%) + (درجة التسليح × {weights.steelWeight}%) + (درجة الأمان × {weights.safetyWeight}%) + (درجة المطاوعة × {weights.ductilityWeight}%).
+   724→   724→              الشكل الحاصل على أعلى درجة يُوصى به. الأوزان قابلة للتعديل حسب أولويات التصميم.
+   725→   725→            </p>
+   726→   726→          </div>
+   727→   727→        </CardContent>
+   728→   728→      </Card>
+   729→   729→
+   730→   730→      {/* ═══════════════ 6. ملخص المدخلات التصميمية ═══════════════ */}
+   731→   731→      <Card className="border-slate-800/60 bg-slate-900/50">
+   732→   732→        <CardHeader className="pb-3">
+   733→   733→          <CardTitle className="text-base font-semibold text-slate-200 flex items-center gap-2">
+   734→   734→            <Info className="h-4 w-4 text-slate-400" />
+   735→   735→            المدخلات التصميمية
+   736→   736→          </CardTitle>
+   737→   737→        </CardHeader>
+   738→   738→        <CardContent>
+   739→   739→          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+   740→   740→            {[
+   741→   741→              { label: 'الضغط التصميمي', value: `${designInputs.pDesignMpa.toFixed(4)} MPa`, color: 'text-sky-400' },
+   742→   742→              { label: 'البحر القصير', value: `${designInputs.tunnelSpanShort} m`, color: 'text-amber-400' },
+   743→   743→              { label: 'البحر الطويل', value: `${designInputs.tunnelSpanLong} m`, color: 'text-amber-400' },
+   744→   744→              { label: 'مقاومة الخرسانة', value: `${designInputs.fcMpa} MPa`, color: 'text-emerald-400' },
+   745→   745→              { label: 'إجهاد الحديد', value: `${designInputs.fyMpa} MPa`, color: 'text-violet-400' },
+   746→   746→            ].map((item) => (
+   747→   747→              <div
+   748→   748→                key={item.label}
+   749→   749→                className="p-3 rounded-lg bg-slate-800/30 border border-slate-800/40 text-center"
+   750→   750→              >
+   751→   751→                <p className="text-[11px] text-slate-500 mb-1">{item.label}</p>
+   752→   752→                <p className={`text-sm font-semibold ${item.color}`}>{item.value}</p>
+   753→   753→              </div>
+   754→   754→            ))}
+   755→   755→          </div>
+   756→   756→        </CardContent>
+   757→   757→      </Card>
+   758→   758→    </div>
+   759→   759→  );
+   760→   760→}
+   761→   761→

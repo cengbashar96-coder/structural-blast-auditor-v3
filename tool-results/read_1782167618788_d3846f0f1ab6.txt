@@ -1,0 +1,827 @@
+     1→/**
+     2→ * ═══════════════════════════════════════════════════════════════════════
+     3→ * 🏛️ لوحة تحكم المدير الحوكمي الأعلى — Admin Dashboard V2
+     4→ * ═══════════════════════════════════════════════════════════════════════
+     5→ *
+     6→ * واجهة المدير السيادية الكاملة:
+     7→ *   - إدارة اشتراكات المستخدمين (قبول / رفض / إيقاف / إعادة تفعيل)
+     8→ *   - إدارة الأذونات التفصيلية لكل مستخدم
+     9→ *   - تغيير أدوار المستخدمين
+    10→ *   - التحكم بقفل خط الأساس الحسابي
+    11→ *   - إحصائيات شاملة عن حالة المنصة
+    12→ *   - سجل التدقيق الجنائي
+    13→ *
+    14→ * المدير الافتراضي: المهندس أبو سليمان
+    15→ * ═══════════════════════════════════════════════════════════════════════
+    16→ */
+    17→
+    18→'use client';
+    19→
+    20→import { useState, useTransition, useEffect, useCallback } from 'react';
+    21→import {
+    22→  toggleBaselineLockAction,
+    23→  getBaselineLockStatusAction,
+    24→  checkSessionAction,
+    25→  logoutAction,
+    26→} from '@/app/actions/auth.actions';
+    27→import {
+    28→  getAllUsersAction,
+    29→  approveUserAction,
+    30→  rejectUserAction,
+    31→  suspendUserAction,
+    32→  reactivateUserAction,
+    33→  updateUserPermissionsAction,
+    34→  changeUserRoleAction,
+    35→  deleteUserAction,
+    36→  seedDefaultAdminAction,
+    37→  type AdminUserView,
+    38→  type AdminUserStats,
+    39→} from '@/app/actions/admin.actions';
+    40→import { ROLE_LABELS, USER_ROLES } from '@/lib/rbac';
+    41→import { Button } from '@/components/ui/button';
+    42→import { Input } from '@/components/ui/input';
+    43→import { Badge } from '@/components/ui/badge';
+    44→import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+    45→import {
+    46→  Dialog,
+    47→  DialogContent,
+    48→  DialogDescription,
+    49→  DialogFooter,
+    50→  DialogHeader,
+    51→  DialogTitle,
+    52→} from '@/components/ui/dialog';
+    53→import {
+    54→  Select,
+    55→  SelectContent,
+    56→  SelectItem,
+    57→  SelectTrigger,
+    58→  SelectValue,
+    59→} from '@/components/ui/select';
+    60→import { Separator } from '@/components/ui/separator';
+    61→
+    62→// ═══════════════════════════════════════════════════════════════════════
+    63→// 📐 الأذونات المتاحة — Permission Definitions
+    64→// ═══════════════════════════════════════════════════════════════════════
+    65→
+    66→const PERMISSION_LABELS: Record<string, string> = {
+    67→  CAN_RUN_ENGINE: 'تشغيل محرك الحسابات',
+    68→  CAN_MODIFY_INPUTS: 'تعديل المدخلات الهندسية',
+    69→  CAN_VIEW_REPORTS: 'عرض التقارير',
+    70→  CAN_EXPORT_DATA: 'تصدير البيانات',
+    71→  CAN_MODIFY_BASELINE: 'تعديل خط الأساس',
+    72→  CAN_MANAGE_PROJECTS: 'إدارة المشاريع',
+    73→  CAN_AUDIT: 'الوصول لسجل التدقيق',
+    74→};
+    75→
+    76→const ALL_PERMISSIONS = Object.keys(PERMISSION_LABELS);
+    77→
+    78→const STATUS_LABELS: Record<string, { label: string; color: string }> = {
+    79→  PENDING: { label: 'معلّق', color: 'border-amber-600 text-amber-400 bg-amber-900/20' },
+    80→  APPROVED: { label: 'موافق عليه', color: 'border-emerald-600 text-emerald-400 bg-emerald-900/20' },
+    81→  REJECTED: { label: 'مرفوض', color: 'border-red-600 text-red-400 bg-red-900/20' },
+    82→  SUSPENDED: { label: 'موقوف', color: 'border-orange-600 text-orange-400 bg-orange-900/20' },
+    83→};
+    84→
+    85→const ROLE_COLORS: Record<string, string> = {
+    86→  ADMIN: 'border-amber-600 text-amber-400 bg-amber-900/20',
+    87→  ENGINEER: 'border-blue-600 text-blue-400 bg-blue-900/20',
+    88→  VIEWER: 'border-slate-600 text-slate-400 bg-slate-800/50',
+    89→};
+    90→
+    91→// ═══════════════════════════════════════════════════════════════════════
+    92→// 🎨 مكونات فرعية — Sub-Components
+    93→// ═══════════════════════════════════════════════════════════════════════
+    94→
+    95→/** بطاقة إحصائية */
+    96→function StatCard({ title, value, color, icon }: { title: string; value: number; color: string; icon: string }) {
+    97→  return (
+    98→    <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-4">
+    99→      <div className="flex items-center justify-between mb-2">
+   100→        <span className="text-xs text-slate-500">{title}</span>
+   101→        <span className="text-lg">{icon}</span>
+   102→      </div>
+   103→      <p className={`text-2xl font-bold ${color}`}>{value}</p>
+   104→    </div>
+   105→  );
+   106→}
+   107→
+   108→/** بطاقة المستخدم في القائمة */
+   109→function UserCard({
+   110→  user,
+   111→  onApprove,
+   112→  onReject,
+   113→  onSuspend,
+   114→  onReactivate,
+   115→  onEditPermissions,
+   116→  onChangeRole,
+   117→  onDelete,
+   118→  isPending,
+   119→}: {
+   120→  user: AdminUserView;
+   121→  onApprove: (id: string) => void;
+   122→  onReject: (id: string, reason: string) => void;
+   123→  onSuspend: (id: string, reason: string) => void;
+   124→  onReactivate: (id: string) => void;
+   125→  onEditPermissions: (user: AdminUserView) => void;
+   126→  onChangeRole: (user: AdminUserView) => void;
+   127→  onDelete: (id: string, name: string) => void;
+   128→  isPending: boolean;
+   129→}) {
+   130→  const statusInfo = STATUS_LABELS[user.subscriptionStatus] || STATUS_LABELS.PENDING;
+   131→  const roleColor = ROLE_COLORS[user.role] || ROLE_COLORS.VIEWER;
+   132→
+   133→  return (
+   134→    <div className="rounded-lg border border-slate-700 bg-slate-900/50 p-4 hover:border-slate-600 transition-colors">
+   135→      <div className="flex items-start justify-between gap-3">
+   136→        {/* معلومات المستخدم */}
+   137→        <div className="flex-1 min-w-0">
+   138→          <div className="flex items-center gap-2 mb-1">
+   139→            <h3 className="text-sm font-semibold text-slate-200 truncate">{user.displayName}</h3>
+   140→            <Badge variant="outline" className={roleColor}>
+   141→              {ROLE_LABELS[user.role as USER_ROLES] || user.role}
+   142→            </Badge>
+   143→            <Badge variant="outline" className={statusInfo.color}>
+   144→              {statusInfo.label}
+   145→            </Badge>
+   146→          </div>
+   147→          <p className="text-xs text-slate-400 font-mono" dir="ltr">{user.email}</p>
+   148→          <div className="flex items-center gap-4 mt-2 text-xs text-slate-500">
+   149→            {user.syndicateId && <span>النقابة: <span className="text-slate-300 font-mono" dir="ltr">{user.syndicateId}</span></span>}
+   150→            {user.specialization && <span>التخصص: <span className="text-slate-300">{user.specialization}</span></span>}
+   151→          </div>
+   152→          {user.statusReason && (
+   153→            <p className="text-xs text-amber-400 mt-1">السبب: {user.statusReason}</p>
+   154→          )}
+   155→          {/* الأذونات */}
+   156→          <div className="flex flex-wrap gap-1 mt-2">
+   157→            {user.permissions.map((perm) => (
+   158→              <span key={perm} className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+   159→                {PERMISSION_LABELS[perm] || perm}
+   160→              </span>
+   161→            ))}
+   162→          </div>
+   163→          <p className="text-[10px] text-slate-600 mt-2">
+   164→            تاريخ التسجيل: {new Date(user.createdAt).toLocaleDateString('ar-SY')}
+   165→            {user.statusChangedAt && ` | آخر تغيير: ${new Date(user.statusChangedAt).toLocaleDateString('ar-SY')}`}
+   166→          </p>
+   167→        </div>
+   168→
+   169→        {/* أزرار الإجراءات */}
+   170→        <div className="flex flex-col gap-1 shrink-0">
+   171→          {user.subscriptionStatus === 'PENDING' && (
+   172→            <>
+   173→              <Button size="sm" className="bg-emerald-700 hover:bg-emerald-600 text-white text-xs h-7 px-3" disabled={isPending} onClick={() => onApprove(user.id)}>
+   174→                قبول
+   175→              </Button>
+   176→              <Button size="sm" variant="outline" className="border-red-800 text-red-400 hover:bg-red-900/30 text-xs h-7 px-3" disabled={isPending} onClick={() => {
+   177→                const reason = prompt('سبب الرفض:');
+   178→                if (reason) onReject(user.id, reason);
+   179→              }}>
+   180→                رفض
+   181→              </Button>
+   182→            </>
+   183→          )}
+   184→          {user.subscriptionStatus === 'APPROVED' && user.role !== 'ADMIN' && (
+   185→            <>
+   186→              <Button size="sm" variant="outline" className="border-orange-800 text-orange-400 hover:bg-orange-900/30 text-xs h-7 px-3" disabled={isPending} onClick={() => {
+   187→                const reason = prompt('سبب الإيقاف:');
+   188→                if (reason) onSuspend(user.id, reason);
+   189→              }}>
+   190→                إيقاف
+   191→              </Button>
+   192→            </>
+   193→          )}
+   194→          {user.subscriptionStatus === 'SUSPENDED' && (
+   195→            <Button size="sm" className="bg-blue-700 hover:bg-blue-600 text-white text-xs h-7 px-3" disabled={isPending} onClick={() => onReactivate(user.id)}>
+   196→              إعادة تفعيل
+   197→            </Button>
+   198→          )}
+   199→          {user.role !== 'ADMIN' && (
+   200→            <>
+   201→              <Button size="sm" variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800 text-xs h-7 px-3" disabled={isPending} onClick={() => onEditPermissions(user)}>
+   202→                الأذونات
+   203→              </Button>
+   204→              <Button size="sm" variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800 text-xs h-7 px-3" disabled={isPending} onClick={() => onChangeRole(user)}>
+   205→                تغيير الدور
+   206→              </Button>
+   207→              <Button size="sm" variant="outline" className="border-red-900/50 text-red-500 hover:bg-red-900/20 text-xs h-7 px-3" disabled={isPending} onClick={() => onDelete(user.id, user.displayName)}>
+   208→                حذف
+   209→              </Button>
+   210→            </>
+   211→          )}
+   212→        </div>
+   213→      </div>
+   214→    </div>
+   215→  );
+   216→}
+   217→
+   218→// ═══════════════════════════════════════════════════════════════════════
+   219→// 🏛️ المكون الرئيسي — Admin Dashboard V2
+   220→// ═══════════════════════════════════════════════════════════════════════
+   221→
+   222→type AdminTab = 'overview' | 'pending' | 'users' | 'baseline';
+   223→
+   224→export function AdminDashboardV2() {
+   225→  const [isPending, startTransition] = useTransition();
+   226→
+   227→  // حالة التبويب النشط
+   228→  const [activeTab, setActiveTab] = useState<AdminTab>('overview');
+   229→
+   230→  // بيانات المستخدمين
+   231→  const [users, setUsers] = useState<AdminUserView[]>([]);
+   232→  const [stats, setStats] = useState<AdminUserStats | null>(null);
+   233→  const [searchQuery, setSearchQuery] = useState('');
+   234→
+   235→  // حالة خط الأساس
+   236→  const [isLocked, setIsLocked] = useState<boolean>(false);
+   237→
+   238→  // المستخدم الحالي
+   239→  const [currentUser, setCurrentUser] = useState<{ userId: string; displayName: string; role: string } | null>(null);
+   240→  const [isLoading, setIsLoading] = useState(true);
+   241→
+   242→  // إشعار
+   243→  const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+   244→
+   245→  // حوار الأذونات
+   246→  const [permissionsDialogUser, setPermissionsDialogUser] = useState<AdminUserView | null>(null);
+   247→  const [editingPermissions, setEditingPermissions] = useState<string[]>([]);
+   248→
+   249→  // حوار تغيير الدور
+   250→  const [roleDialogUser, setRoleDialogUser] = useState<AdminUserView | null>(null);
+   251→  const [selectedRole, setSelectedRole] = useState<string>('');
+   252→
+   253→  // حوار الحذف
+   254→  const [deleteDialogUser, setDeleteDialogUser] = useState<{ id: string; name: string } | null>(null);
+   255→  const [deleteReason, setDeleteReason] = useState('');
+   256→
+   257→  /** تحميل البيانات الأولية */
+   258→  const loadData = useCallback(() => {
+   259→    startTransition(async () => {
+   260→      try {
+   261→        const [statusResult, sessionResult, usersResult] = await Promise.all([
+   262→          getBaselineLockStatusAction(),
+   263→          checkSessionAction(),
+   264→          getAllUsersAction(),
+   265→        ]);
+   266→
+   267→        setIsLocked(statusResult.isLocked);
+   268→
+   269→        if (sessionResult.isAuthenticated && sessionResult.user) {
+   270→          setCurrentUser(sessionResult.user);
+   271→        }
+   272→
+   273→        setUsers(usersResult.users);
+   274→        setStats(usersResult.stats);
+   275→      } catch {
+   276→        showNotification('error', 'فشل تحميل البيانات الأولية');
+   277→      } finally {
+   278→        setIsLoading(false);
+   279→      }
+   280→    });
+   281→  }, []);
+   282→
+   283→  useEffect(() => {
+   284→    loadData();
+   285→  }, [loadData]);
+   286→
+   287→  /** عرض إشعار مؤقت */
+   288→  function showNotification(type: 'success' | 'error', message: string) {
+   289→    setNotification({ type, message });
+   290→    setTimeout(() => setNotification(null), 5000);
+   291→  }
+   292→
+   293→  /** تبديل قفل خط الأساس */
+   294→  function handleToggleBaselineLock() {
+   295→    startTransition(async () => {
+   296→      const result = await toggleBaselineLockAction();
+   297→      if (result.success) {
+   298→        setIsLocked(result.isLocked);
+   299→        showNotification('success', result.isLocked ? 'تم قفل خط الأساس الحسابي' : 'تم فتح خط الأساس الحسابي');
+   300→      } else {
+   301→        showNotification('error', result.error || 'فشل تنفيذ العملية');
+   302→      }
+   303→    });
+   304→  }
+   305→
+   306→  /** قبول مستخدم */
+   307→  function handleApprove(userId: string) {
+   308→    startTransition(async () => {
+   309→      const result = await approveUserAction(userId);
+   310→      if (result.success) {
+   311→        showNotification('success', 'تم قبول الاشتراك بنجاح');
+   312→        loadData();
+   313→      } else {
+   314→        showNotification('error', result.error || 'فشل قبول الاشتراك');
+   315→      }
+   316→    });
+   317→  }
+   318→
+   319→  /** رفض مستخدم */
+   320→  function handleReject(userId: string, reason: string) {
+   321→    startTransition(async () => {
+   322→      const result = await rejectUserAction(userId, reason);
+   323→      if (result.success) {
+   324→        showNotification('success', 'تم رفض الاشتراك');
+   325→        loadData();
+   326→      } else {
+   327→        showNotification('error', result.error || 'فشل رفض الاشتراك');
+   328→      }
+   329→    });
+   330→  }
+   331→
+   332→  /** إيقاف مستخدم */
+   333→  function handleSuspend(userId: string, reason: string) {
+   334→    startTransition(async () => {
+   335→      const result = await suspendUserAction(userId, reason);
+   336→      if (result.success) {
+   337→        showNotification('success', 'تم إيقاف الاشتراك');
+   338→        loadData();
+   339→      } else {
+   340→        showNotification('error', result.error || 'فشل إيقاف الاشتراك');
+   341→      }
+   342→    });
+   343→  }
+   344→
+   345→  /** إعادة تفعيل مستخدم */
+   346→  function handleReactivate(userId: string) {
+   347→    startTransition(async () => {
+   348→      const result = await reactivateUserAction(userId);
+   349→      if (result.success) {
+   350→        showNotification('success', 'تم إعادة التفعيل بنجاح');
+   351→        loadData();
+   352→      } else {
+   353→        showNotification('error', result.error || 'فشل إعادة التفعيل');
+   354→      }
+   355→    });
+   356→  }
+   357→
+   358→  /** فتح حوار الأذونات */
+   359→  function handleEditPermissions(user: AdminUserView) {
+   360→    setPermissionsDialogUser(user);
+   361→    setEditingPermissions([...user.permissions]);
+   362→  }
+   363→
+   364→  /** حفظ الأذونات */
+   365→  function handleSavePermissions() {
+   366→    if (!permissionsDialogUser) return;
+   367→    startTransition(async () => {
+   368→      const result = await updateUserPermissionsAction(permissionsDialogUser.id, editingPermissions);
+   369→      if (result.success) {
+   370→        showNotification('success', 'تم تحديث الأذونات بنجاح');
+   371→        setPermissionsDialogUser(null);
+   372→        loadData();
+   373→      } else {
+   374→        showNotification('error', result.error || 'فشل تحديث الأذونات');
+   375→      }
+   376→    });
+   377→  }
+   378→
+   379→  /** فتح حوار تغيير الدور */
+   380→  function handleChangeRole(user: AdminUserView) {
+   381→    setRoleDialogUser(user);
+   382→    setSelectedRole(user.role);
+   383→  }
+   384→
+   385→  /** حفظ الدور الجديد */
+   386→  function handleSaveRole() {
+   387→    if (!roleDialogUser) return;
+   388→    startTransition(async () => {
+   389→      const result = await changeUserRoleAction(roleDialogUser.id, selectedRole);
+   390→      if (result.success) {
+   391→        showNotification('success', 'تم تغيير الدور بنجاح');
+   392→        setRoleDialogUser(null);
+   393→        loadData();
+   394→      } else {
+   395→        showNotification('error', result.error || 'فشل تغيير الدور');
+   396→      }
+   397→    });
+   398→  }
+   399→
+   400→  /** حذف مستخدم */
+   401→  function handleDelete() {
+   402→    if (!deleteDialogUser || !deleteReason.trim()) return;
+   403→    startTransition(async () => {
+   404→      const result = await deleteUserAction(deleteDialogUser.id, deleteReason);
+   405→      if (result.success) {
+   406→        showNotification('success', 'تم حذف المستخدم');
+   407→        setDeleteDialogUser(null);
+   408→        setDeleteReason('');
+   409→        loadData();
+   410→      } else {
+   411→        showNotification('error', result.error || 'فشل حذف المستخدم');
+   412→      }
+   413→    });
+   414→  }
+   415→
+   416→  /** بذر المدير الافتراضي */
+   417→  function handleSeedAdmin() {
+   418→    startTransition(async () => {
+   419→      const result = await seedDefaultAdminAction();
+   420→      if (result.success) {
+   421→        showNotification('success', 'تم إنشاء حساب المدير الافتراضي');
+   422→        loadData();
+   423→      } else {
+   424→        showNotification('error', result.error || 'فشل إنشاء حساب المدير');
+   425→      }
+   426→    });
+   427→  }
+   428→
+   429→  /** تسجيل الخروج */
+   430→  function handleLogout() {
+   431→    startTransition(async () => {
+   432→      await logoutAction();
+   433→      window.location.href = '/auth/login';
+   434→    });
+   435→  }
+   436→
+   437→  // ─── تصفية المستخدمين حسب البحث ───
+   438→  const filteredUsers = users.filter(u =>
+   439→    u.displayName.includes(searchQuery) ||
+   440→    u.email.includes(searchQuery) ||
+   441→    (u.syndicateId && u.syndicateId.includes(searchQuery))
+   442→  );
+   443→
+   444→  const pendingUsers = filteredUsers.filter(u => u.subscriptionStatus === 'PENDING');
+   445→  const approvedUsers = filteredUsers.filter(u => u.subscriptionStatus === 'APPROVED');
+   446→  const suspendedUsers = filteredUsers.filter(u => u.subscriptionStatus === 'SUSPENDED');
+   447→  const rejectedUsers = filteredUsers.filter(u => u.subscriptionStatus === 'REJECTED');
+   448→
+   449→  // ─── شاشة التحميل ───
+   450→  if (isLoading) {
+   451→    return (
+   452→      <div className="flex items-center justify-center min-h-[60vh]">
+   453→        <div className="flex flex-col items-center gap-3">
+   454→          <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-600 border-t-emerald-500" />
+   455→          <p className="text-sm text-slate-400">جارٍ تحميل لوحة التحكم...</p>
+   456→        </div>
+   457→      </div>
+   458→    );
+   459→  }
+   460→
+   461→  // ─── لا توجد جلسة صالحة ───
+   462→  if (!currentUser) {
+   463→    return (
+   464→      <div className="flex items-center justify-center min-h-[60vh]">
+   465→        <Card className="w-full max-w-md border-red-900/50 bg-slate-900/50">
+   466→          <CardHeader className="text-center">
+   467→            <CardTitle className="text-red-400">غير مُصادَق</CardTitle>
+   468→            <CardDescription className="text-slate-400">يجب تسجيل الدخول للوصول إلى لوحة التحكم</CardDescription>
+   469→          </CardHeader>
+   470→          <CardContent className="text-center">
+   471→            <Button asChild className="bg-blue-700 hover:bg-blue-600">
+   472→              <a href="/auth/login">تسجيل الدخول</a>
+   473→            </Button>
+   474→          </CardContent>
+   475→        </Card>
+   476→      </div>
+   477→    );
+   478→  }
+   479→
+   480→  return (
+   481→    <div className="space-y-6" dir="rtl">
+   482→      {/* ═══ إشعار الإجراء ═══ */}
+   483→      {notification && (
+   484→        <div className={`rounded-md border p-3 text-sm ${notification.type === 'success' ? 'bg-emerald-900/30 border-emerald-700 text-emerald-300' : 'bg-red-900/30 border-red-700 text-red-300'}`} role="alert">
+   485→          {notification.message}
+   486→        </div>
+   487→      )}
+   488→
+   489→      {/* ═══ رأس لوحة التحكم ═══ */}
+   490→      <div className="flex items-center justify-between">
+   491→        <div>
+   492→          <h1 className="text-2xl font-bold text-slate-100">
+   493→            لوحة التحكم الحوكمية العليا
+   494→          </h1>
+   495→          <p className="text-sm text-slate-400 mt-1">
+   496→            المهندس أبو سليمان — منصة المدقق الديناميكي الموحد V3.0
+   497→          </p>
+   498→        </div>
+   499→        <div className="flex items-center gap-3">
+   500→          <Badge variant="outline" className="border-amber-600 text-amber-400 bg-amber-900/20">
+   501→            {currentUser.displayName}
+   502→          </Badge>
+   503→          <Button variant="outline" onClick={handleLogout} disabled={isPending} className="border-slate-600 text-slate-300 hover:bg-slate-800">
+   504→            تسجيل الخروج
+   505→          </Button>
+   506→        </div>
+   507→      </div>
+   508→
+   509→      {/* ═══ تبويبات التنقل ═══ */}
+   510→      <div className="flex gap-1 border-b border-slate-800">
+   511→        {([
+   512→          { key: 'overview' as AdminTab, label: 'نظرة عامة', count: undefined },
+   513→          { key: 'pending' as AdminTab, label: 'طلبات معلّقة', count: stats?.pending },
+   514→          { key: 'users' as AdminTab, label: 'المستخدمون', count: stats?.total },
+   515→          { key: 'baseline' as AdminTab, label: 'خط الأساس', count: undefined },
+   516→        ] as const).map((tab) => (
+   517→          <button
+   518→            key={tab.key}
+   519→            onClick={() => setActiveTab(tab.key)}
+   520→            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+   521→              activeTab === tab.key
+   522→                ? 'border-emerald-500 text-emerald-400'
+   523→                : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-600'
+   524→            }`}
+   525→          >
+   526→            {tab.label}
+   527→            {tab.count !== undefined && tab.count > 0 && (
+   528→              <span className="mr-2 inline-flex items-center justify-center h-5 min-w-5 px-1 rounded-full text-[10px] font-bold bg-amber-600 text-white">
+   529→                {tab.count}
+   530→              </span>
+   531→            )}
+   532→          </button>
+   533→        ))}
+   534→      </div>
+   535→
+   536→      {/* ═══ تبويب: نظرة عامة ═══ */}
+   537→      {activeTab === 'overview' && stats && (
+   538→        <div className="space-y-6">
+   539→          {/* إحصائيات */}
+   540→          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+   541→            <StatCard title="إجمالي المستخدمين" value={stats.total} color="text-slate-200" icon="👥" />
+   542→            <StatCard title="طلبات معلّقة" value={stats.pending} color="text-amber-400" icon="⏳" />
+   543→            <StatCard title="مستخدمون فعّالون" value={stats.approved} color="text-emerald-400" icon="✅" />
+   544→            <StatCard title="موقوفون" value={stats.suspended} color="text-orange-400" icon="⛔" />
+   545→          </div>
+   546→
+   547→          <div className="grid grid-cols-3 gap-4">
+   548→            <StatCard title="مديرون" value={stats.admins} color="text-amber-400" icon="👑" />
+   549→            <StatCard title="مهندسون" value={stats.engineers} color="text-blue-400" icon="🔧" />
+   550→            <StatCard title="مراقبون" value={stats.viewers} color="text-slate-400" icon="👁️" />
+   551→          </div>
+   552→
+   553→          {/* إجراءات سريعة */}
+   554→          <Card className="border-slate-700 bg-slate-900/50">
+   555→            <CardHeader>
+   556→              <CardTitle className="text-lg text-slate-200">إجراءات سريعة</CardTitle>
+   557→            </CardHeader>
+   558→            <CardContent className="flex flex-wrap gap-3">
+   559→              <Button className="bg-amber-700 hover:bg-amber-600 text-white" disabled={isPending} onClick={handleSeedAdmin}>
+   560→                بذر حساب المدير الافتراضي (أبو سليمان)
+   561→              </Button>
+   562→              <Button variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800" disabled={isPending} onClick={() => setActiveTab('pending')}>
+   563→                مراجعة الطلبات المعلّقة ({stats.pending})
+   564→              </Button>
+   565→            </CardContent>
+   566→          </Card>
+   567→
+   568→          {/* معلومات الأمان */}
+   569→          <Card className="border-slate-700 bg-slate-900/50">
+   570→            <CardHeader>
+   571→              <CardTitle className="text-lg text-slate-200">معلومات الأمان والحماية</CardTitle>
+   572→            </CardHeader>
+   573→            <CardContent>
+   574→              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+   575→                <div className="rounded-md bg-slate-800/50 p-3 border border-slate-700">
+   576→                  <p className="text-xs font-medium text-blue-400 mb-1">تشفير الجلسة</p>
+   577→                  <p className="text-xs text-slate-400">AES-256-GCM + httpOnly</p>
+   578→                </div>
+   579→                <div className="rounded-md bg-slate-800/50 p-3 border border-slate-700">
+   580→                  <p className="text-xs font-medium text-emerald-400 mb-1">كلمات المرور</p>
+   581→                  <p className="text-xs text-slate-400">bcrypt (12 rounds)</p>
+   582→                </div>
+   583→                <div className="rounded-md bg-slate-800/50 p-3 border border-slate-700">
+   584→                  <p className="text-xs font-medium text-amber-400 mb-1">حماية CSRF</p>
+   585→                  <p className="text-xs text-slate-400">SameSite: Strict</p>
+   586→                </div>
+   587→                <div className="rounded-md bg-slate-800/50 p-3 border border-slate-700">
+   588→                  <p className="text-xs font-medium text-purple-400 mb-1">حماية المسارات</p>
+   589→                  <p className="text-xs text-slate-400">Middleware + Server RBAC</p>
+   590→                </div>
+   591→              </div>
+   592→            </CardContent>
+   593→          </Card>
+   594→        </div>
+   595→      )}
+   596→
+   597→      {/* ═══ تبويب: طلبات معلّقة ═══ */}
+   598→      {activeTab === 'pending' && (
+   599→        <div className="space-y-4">
+   600→          <div className="flex items-center justify-between">
+   601→            <h2 className="text-lg font-semibold text-slate-200">
+   602→              الطلبات المعلّقة ({pendingUsers.length})
+   603→            </h2>
+   604→          </div>
+   605→
+   606→          {pendingUsers.length === 0 ? (
+   607→            <div className="text-center py-12">
+   608→              <p className="text-slate-500 text-lg mb-2">لا توجد طلبات معلّقة</p>
+   609→              <p className="text-slate-600 text-sm">جميع الطلبات تمت مراجعتها</p>
+   610→            </div>
+   611→          ) : (
+   612→            <div className="space-y-3">
+   613→              {pendingUsers.map((user) => (
+   614→                <UserCard
+   615→                  key={user.id}
+   616→                  user={user}
+   617→                  onApprove={handleApprove}
+   618→                  onReject={handleReject}
+   619→                  onSuspend={handleSuspend}
+   620→                  onReactivate={handleReactivate}
+   621→                  onEditPermissions={handleEditPermissions}
+   622→                  onChangeRole={handleChangeRole}
+   623→                  onDelete={(id, name) => setDeleteDialogUser({ id, name })}
+   624→                  isPending={isPending}
+   625→                />
+   626→              ))}
+   627→            </div>
+   628→          )}
+   629→        </div>
+   630→      )}
+   631→
+   632→      {/* ═══ تبويب: المستخدمون ═══ */}
+   633→      {activeTab === 'users' && (
+   634→        <div className="space-y-4">
+   635→          <div className="flex items-center gap-3">
+   636→            <Input
+   637→              placeholder="بحث بالاسم أو البريد أو رقم النقابة..."
+   638→              value={searchQuery}
+   639→              onChange={(e) => setSearchQuery(e.target.value)}
+   640→              className="max-w-md bg-slate-800 border-slate-600 text-slate-100 placeholder:text-slate-500"
+   641→              dir="rtl"
+   642→            />
+   643→          </div>
+   644→
+   645→          {/* مستخدمون فعّالون */}
+   646→          {approvedUsers.length > 0 && (
+   647→            <div className="space-y-2">
+   648→              <h3 className="text-sm font-semibold text-emerald-400 flex items-center gap-2">
+   649→                مستخدمون فعّالون ({approvedUsers.length})
+   650→              </h3>
+   651→              {approvedUsers.map((user) => (
+   652→                <UserCard key={user.id} user={user} onApprove={handleApprove} onReject={handleReject} onSuspend={handleSuspend} onReactivate={handleReactivate} onEditPermissions={handleEditPermissions} onChangeRole={handleChangeRole} onDelete={(id, name) => setDeleteDialogUser({ id, name })} isPending={isPending} />
+   653→              ))}
+   654→            </div>
+   655→          )}
+   656→
+   657→          {/* موقوفون */}
+   658→          {suspendedUsers.length > 0 && (
+   659→            <div className="space-y-2">
+   660→              <h3 className="text-sm font-semibold text-orange-400 flex items-center gap-2">
+   661→                موقوفون ({suspendedUsers.length})
+   662→              </h3>
+   663→              {suspendedUsers.map((user) => (
+   664→                <UserCard key={user.id} user={user} onApprove={handleApprove} onReject={handleReject} onSuspend={handleSuspend} onReactivate={handleReactivate} onEditPermissions={handleEditPermissions} onChangeRole={handleChangeRole} onDelete={(id, name) => setDeleteDialogUser({ id, name })} isPending={isPending} />
+   665→              ))}
+   666→            </div>
+   667→          )}
+   668→
+   669→          {/* مرفوضون */}
+   670→          {rejectedUsers.length > 0 && (
+   671→            <div className="space-y-2">
+   672→              <h3 className="text-sm font-semibold text-red-400 flex items-center gap-2">
+   673→                مرفوضون ({rejectedUsers.length})
+   674→              </h3>
+   675→              {rejectedUsers.map((user) => (
+   676→                <UserCard key={user.id} user={user} onApprove={handleApprove} onReject={handleReject} onSuspend={handleSuspend} onReactivate={handleReactivate} onEditPermissions={handleEditPermissions} onChangeRole={handleChangeRole} onDelete={(id, name) => setDeleteDialogUser({ id, name })} isPending={isPending} />
+   677→              ))}
+   678→            </div>
+   679→          )}
+   680→
+   681→          {filteredUsers.length === 0 && (
+   682→            <div className="text-center py-12">
+   683→              <p className="text-slate-500">لا توجد نتائج مطابقة</p>
+   684→            </div>
+   685→          )}
+   686→        </div>
+   687→      )}
+   688→
+   689→      {/* ═══ تبويب: خط الأساس ═══ */}
+   690→      {activeTab === 'baseline' && (
+   691→        <Card className="border-slate-700 bg-slate-900/50">
+   692→          <CardHeader>
+   693→            <CardTitle className="text-lg text-slate-200">التحكم بخط الأساس الحسابي</CardTitle>
+   694→            <CardDescription className="text-slate-400">
+   695→              قفل خط الأساس يمنع تعديل الثوابت المرجعية (الكود السوري 2024 و UFC 3-340-02).
+   696→              هذا الإجراء يتطلب دور المدير الحوكمي الأعلى.
+   697→            </CardDescription>
+   698→          </CardHeader>
+   699→          <CardContent>
+   700→            <div className="flex items-center justify-between rounded-md border border-slate-700 bg-slate-800/50 p-4">
+   701→              <div className="space-y-1">
+   702→                <div className="flex items-center gap-3">
+   703→                  <span className="text-sm font-medium text-slate-200">حالة خط الأساس:</span>
+   704→                  <Badge variant="outline" className={isLocked ? 'border-red-600 text-red-400 bg-red-900/20' : 'border-emerald-600 text-emerald-400 bg-emerald-900/20'}>
+   705→                    {isLocked ? 'مقفل' : 'مفتوح'}
+   706→                  </Badge>
+   707→                </div>
+   708→              </div>
+   709→              <Button onClick={handleToggleBaselineLock} disabled={isPending} className={isLocked ? 'bg-emerald-700 hover:bg-emerald-600 text-white' : 'bg-red-700 hover:bg-red-600 text-white'}>
+   710→                {isPending ? (
+   711→                  <span className="flex items-center gap-2">
+   712→                    <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+   713→                    جارٍ التنفيذ...
+   714→                  </span>
+   715→                ) : isLocked ? 'فتح خط الأساس' : 'قفل خط الأساس'}
+   716→              </Button>
+   717→            </div>
+   718→            <div className="mt-3 rounded-md bg-amber-900/20 border border-amber-800/50 p-3">
+   719→              <p className="text-xs text-amber-400">
+   720→                التحقق من الصلاحيات يتم على الخادم حصراً عبر enforceAdminPolicy. جميع المحاولات تُسجَّل في طابور التدقيق الجنائي.
+   721→              </p>
+   722→            </div>
+   723→          </CardContent>
+   724→        </Card>
+   725→      )}
+   726→
+   727→      {/* ═══ حوار الأذونات ═══ */}
+   728→      <Dialog open={!!permissionsDialogUser} onOpenChange={(open) => { if (!open) setPermissionsDialogUser(null); }}>
+   729→        <DialogContent className="bg-slate-900 border-slate-700 text-slate-100" dir="rtl">
+   730→          <DialogHeader>
+   731→            <DialogTitle>إدارة الأذونات — {permissionsDialogUser?.displayName}</DialogTitle>
+   732→            <DialogDescription className="text-slate-400">حدد الأذونات التي تريد منحها لهذا المستخدم</DialogDescription>
+   733→          </DialogHeader>
+   734→          <div className="space-y-3 py-4">
+   735→            {ALL_PERMISSIONS.map((perm) => (
+   736→              <label key={perm} className="flex items-center gap-3 cursor-pointer">
+   737→                <input
+   738→                  type="checkbox"
+   739→                  checked={editingPermissions.includes(perm)}
+   740→                  onChange={(e) => {
+   741→                    if (e.target.checked) {
+   742→                      setEditingPermissions((prev) => [...prev, perm]);
+   743→                    } else {
+   744→                      setEditingPermissions((prev) => prev.filter((p) => p !== perm));
+   745→                    }
+   746→                  }}
+   747→                  className="h-4 w-4 rounded border-slate-600 bg-slate-800 text-emerald-500 focus:ring-emerald-500"
+   748→                />
+   749→                <span className="text-sm text-slate-300">{PERMISSION_LABELS[perm]}</span>
+   750→              </label>
+   751→            ))}
+   752→          </div>
+   753→          <DialogFooter className="gap-2">
+   754→            <Button className="bg-emerald-700 hover:bg-emerald-600 text-white" disabled={isPending} onClick={handleSavePermissions}>
+   755→              حفظ الأذونات
+   756→            </Button>
+   757→            <Button variant="outline" className="border-slate-600 text-slate-300" onClick={() => setPermissionsDialogUser(null)}>
+   758→              إلغاء
+   759→            </Button>
+   760→          </DialogFooter>
+   761→        </DialogContent>
+   762→      </Dialog>
+   763→
+   764→      {/* ═══ حوار تغيير الدور ═══ */}
+   765→      <Dialog open={!!roleDialogUser} onOpenChange={(open) => { if (!open) setRoleDialogUser(null); }}>
+   766→        <DialogContent className="bg-slate-900 border-slate-700 text-slate-100" dir="rtl">
+   767→          <DialogHeader>
+   768→            <DialogTitle>تغيير الدور — {roleDialogUser?.displayName}</DialogTitle>
+   769→            <DialogDescription className="text-slate-400">
+   770→              الدور الحالي: {roleDialogUser ? ROLE_LABELS[roleDialogUser.role as USER_ROLES] : ''}
+   771→            </DialogDescription>
+   772→          </DialogHeader>
+   773→          <div className="py-4">
+   774→            <Select value={selectedRole} onValueChange={setSelectedRole}>
+   775→              <SelectTrigger className="bg-slate-800 border-slate-600 text-slate-100">
+   776→                <SelectValue placeholder="اختر الدور الجديد" />
+   777→              </SelectTrigger>
+   778→              <SelectContent className="bg-slate-800 border-slate-600">
+   779→                <SelectItem value={USER_ROLES.ENGINEER}>{ROLE_LABELS[USER_ROLES.ENGINEER]}</SelectItem>
+   780→                <SelectItem value={USER_ROLES.VIEWER}>{ROLE_LABELS[USER_ROLES.VIEWER]}</SelectItem>
+   781→              </SelectContent>
+   782→            </Select>
+   783→          </div>
+   784→          <DialogFooter className="gap-2">
+   785→            <Button className="bg-amber-700 hover:bg-amber-600 text-white" disabled={isPending} onClick={handleSaveRole}>
+   786→              تغيير الدور
+   787→            </Button>
+   788→            <Button variant="outline" className="border-slate-600 text-slate-300" onClick={() => setRoleDialogUser(null)}>
+   789→              إلغاء
+   790→            </Button>
+   791→          </DialogFooter>
+   792→        </DialogContent>
+   793→      </Dialog>
+   794→
+   795→      {/* ═══ حوار الحذف ═══ */}
+   796→      <Dialog open={!!deleteDialogUser} onOpenChange={(open) => { if (!open) { setDeleteDialogUser(null); setDeleteReason(''); } }}>
+   797→        <DialogContent className="bg-slate-900 border-slate-700 text-slate-100" dir="rtl">
+   798→          <DialogHeader>
+   799→            <DialogTitle className="text-red-400">حذف مستخدم — {deleteDialogUser?.name}</DialogTitle>
+   800→            <DialogDescription className="text-slate-400">
+   801→              هذا الإجراء نهائي ولا يمكن التراجع عنه. سيتم حذف جميع بيانات المستخدم.
+   802→            </DialogDescription>
+   803→          </DialogHeader>
+   804→          <div className="py-4">
+   805→            <label className="text-sm text-slate-300 mb-2 block">سبب الحذف <span className="text-red-400">*</span></label>
+   806→            <Input
+   807→              value={deleteReason}
+   808→              onChange={(e) => setDeleteReason(e.target.value)}
+   809→              placeholder="أدخل سبب الحذف..."
+   810→              className="bg-slate-800 border-slate-600 text-slate-100"
+   811→              dir="rtl"
+   812→            />
+   813→          </div>
+   814→          <DialogFooter className="gap-2">
+   815→            <Button className="bg-red-700 hover:bg-red-600 text-white" disabled={isPending || !deleteReason.trim()} onClick={handleDelete}>
+   816→              حذف نهائي
+   817→            </Button>
+   818→            <Button variant="outline" className="border-slate-600 text-slate-300" onClick={() => { setDeleteDialogUser(null); setDeleteReason(''); }}>
+   819→              إلغاء
+   820→            </Button>
+   821→          </DialogFooter>
+   822→        </DialogContent>
+   823→      </Dialog>
+   824→    </div>
+   825→  );
+   826→}
+   827→
