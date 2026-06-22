@@ -1,0 +1,93 @@
+# ═══════════════════════════════════════════════════════════════════════
+# 🚀 إعدادات النشر على Netlify — Netlify Deployment Configuration
+# منصة المدقق الديناميكي الموحد V3.0
+# ═══════════════════════════════════════════════════════════════════════
+#
+# ⚠️ متغيرات البيئة المطلوبة (تُعيَّن من لوحة تحكم Netlify):
+#   - ENCRYPTION_KEY: مفتاح تشفير 64 حرف hex (AES-256-GCM)
+#   - NEXT_PUBLIC_SUPABASE_URL: رابط مشروع Supabase
+#   - NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: مفتاح Supabase العام
+#   - SUPABASE_SECRET_KEY: مفتاح Supabase السري
+# ═══════════════════════════════════════════════════════════════════════
+
+[build]
+  # أمر البناء — توليد Prisma Client ثم بناء Next.js فقط
+  command = "npx prisma generate && npx next build"
+
+  # مجلد النشر — Next.js plugin يتعامل مع هذا تلقائياً
+  publish = ".next"
+
+# ═══════════════════════════════════════════════════════════════════════
+# 🔌 إضافة Netlify Next.js — ضرورية لتشغيل Server Actions و API Routes
+# ═══════════════════════════════════════════════════════════════════════
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# ═══════════════════════════════════════════════════════════════════════
+# 🔄 إعادة توجيه API Routes المتداخلة — Netlify + Next.js 16 Fix
+# ═══════════════════════════════════════════════════════════════════════
+# المشكلة: @netlify/plugin-nextjs لا يُنشئ Functions صحيحة
+# للمسارات المتداخلة مثل /api/auth/login في Next.js 16
+# الحل: مسارات API مباشرة + redirects من المسارات القديمة
+# ═══════════════════════════════════════════════════════════════════════
+
+[[redirects]]
+  from = "/api/auth/login"
+  to = "/api/auth-login"
+  status = 200
+
+[[redirects]]
+  from = "/api/auth/logout"
+  to = "/api/auth-logout"
+  status = 200
+
+[[redirects]]
+  from = "/api/auth/register"
+  to = "/api/auth-register"
+  status = 200
+
+[[redirects]]
+  from = "/api/auth/session"
+  to = "/api/auth-session"
+  status = 200
+
+# ═══════════════════════════════════════════════════════════════════════
+# 🔄 توجيهات إعادة الكتابة — Service Worker و Manifest
+# ═══════════════════════════════════════════════════════════════════════
+
+# Service Worker — يجب تحديثه دائماً من الخادم (لا كاش)
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    Content-Type = "application/javascript; charset=utf-8"
+
+# Manifest — يُحدَّث مع كل نشر
+[[headers]]
+  for = "/manifest.json"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# HTML pages — لا تُخزَّن مؤقتاً
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# ═══════════════════════════════════════════════════════════════════════
+# 🛡️ رؤوس الأمان — Security Headers
+# ═══════════════════════════════════════════════════════════════════════
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+
+# ═══════════════════════════════════════════════════════════════════════
+# ⚡ إعدادات الدوال الخادومية — Function Configuration
+# ═══════════════════════════════════════════════════════════════════════
+[functions]
+  included_files = ["prisma/**/*"]
+  node_bundler = "nft"

@@ -1,0 +1,17 @@
+-- ═══════════════════════════════════════════════════════════════════════
+-- 🔄 تراجع التهجير — Rollback Migration
+-- ═══════════════════════════════════════════════════════════════════════
+
+DROP TABLE IF EXISTS "RtmRecord" CASCADE;
+DROP TABLE IF EXISTS "Scenario" CASCADE;
+DROP TABLE IF EXISTS "Project" CASCADE;
+DROP TABLE IF EXISTS "ProcessedEvent" CASCADE;
+DROP TABLE IF EXISTS "AuditLog" CASCADE;
+DROP TABLE IF EXISTS "User" CASCADE;
+
+DROP TYPE IF EXISTS "EventStatus" CASCADE;
+DROP TYPE IF EXISTS "StructuralStatus" CASCADE;
+DROP TYPE IF EXISTS "RtmStatus" CASCADE;
+DROP TYPE IF EXISTS "SyncQueueStatus" CASCADE;
+DROP TYPE IF EXISTS "SubscriptionStatus" CASCADE;
+DROP TYPE IF EXISTS "Permission" CASCADE;
