@@ -1,0 +1,334 @@
+     1→/**
+     2→ * النموذج الموحّد للمتغيرات — الخطوات 2 إلى 8
+     3→ * منصة المدقق الديناميكي الموحد V3.0
+     4→ *
+     5→ * التصنيف الصارم (5 فئات):
+     6→ * - input:    قيم يدخلها المستخدم مباشرة
+     7→ * - lookup:   قيم من جداول المرجعية (إكسيل / كود / جداول B)
+     8→ * - computed: قيم تُحسب داخل المحرك ولا تنتقل لمحرك آخر
+     9→ * - locked:   قيم يُنتجها محرك ويستهلكها التالي — للقراءة فقط
+    10→ * - output:   المخرجات النهائية لخط الأنابيب
+    11→ *
+    12→ * فصل المسارات: سقف (roof) | جدار (wall) | مشترك (shared)
+    13→ * القيم المقفلة لا تُعاد كتابتها بين المحركات
+    14→ */
+    15→
+    16→// ═══════════════════════════════════════════════════════════════════════
+    17→// أنواع التصنيف
+    18→// ═══════════════════════════════════════════════════════════════════════
+    19→
+    20→export type VariableType = 'input' | 'lookup' | 'computed' | 'locked' | 'output';
+    21→export type EngineName = 'penetration' | 'blast' | 'structural';
+    22→export type PathType = 'roof' | 'wall' | 'shared';
+    23→
+    24→export interface UnifiedVariable {
+    25→  name: string;
+    26→  symbol: string;
+    27→  descriptionAr: string;
+    28→  descriptionEn: string;
+    29→  unit: string;
+    30→  source: string;
+    31→  type: VariableType;
+    32→  dependsOn: string[];
+    33→  locked: boolean;
+    34→  engine: EngineName;
+    35→  path: PathType;
+    36→  formula?: string;
+    37→}
+    38→
+    39→export interface DependencyNode {
+    40→  symbol: string;
+    41→  type: VariableType;
+    42→  engine: EngineName;
+    43→  path: PathType;
+    44→  dependsOn: string[];
+    45→  dependedBy: string[];
+    46→}
+    47→
+    48→export interface EngineBoundary {
+    49→  penetrationToBlast: string[];
+    50→  blastRoofToStructural: string[];
+    51→  blastWallToStructural: string[];
+    52→  withinBlastRoof: string[];
+    53→  withinBlastWall: string[];
+    54→}
+    55→
+    56→// ═══════════════════════════════════════════════════════════════════════
+    57→// الجدول الموحّد — 130 متغير بدون تكرار
+    58→// ═══════════════════════════════════════════════════════════════════════
+    59→
+    60→export const UNIFIED_VARIABLE_TABLE: UnifiedVariable[] = [
+    61→
+    62→  // ──────────────────────────────────────────────────────────────────
+    63→  // القسم 1: المدخلات الأساسية (input) — محرك الاختراق
+    64→  // ──────────────────────────────────────────────────────────────────
+    65→  { name: 'P',           symbol: 'P',       descriptionAr: 'وزن القنبلة',                     descriptionEn: 'Bomb weight',                      unit: 'kg',    source: 'user_input',    type: 'input',   dependsOn: [],        locked: false, engine: 'penetration', path: 'shared' },
+    66→  { name: 'lo_b',        symbol: 'loб',     descriptionAr: 'الطول الكلي للقنبلة',              descriptionEn: 'Overall bomb length',               unit: 'm',     source: 'user_input',    type: 'input',   dependsOn: [],        locked: false, engine: 'penetration', path: 'shared' },
+    67→  { name: 'lk',          symbol: 'lk',      descriptionAr: 'طول جسم القنبلة',                  descriptionEn: 'Bomb body length',                  unit: 'm',     source: 'user_input',    type: 'input',   dependsOn: [],        locked: false, engine: 'penetration', path: 'shared' },
+    68→  { name: 'dk',          symbol: 'dk',      descriptionAr: 'قطر هيكل القنبلة',                 descriptionEn: 'Bomb body diameter',                unit: 'm',     source: 'user_input',    type: 'input',   dependsOn: [],        locked: false, engine: 'penetration', path: 'shared' },
+    69→  { name: 'ld_ratio',    symbol: 'lᴈ/dᴈ',  descriptionAr: 'نسبة طول الجسم للقطر',             descriptionEn: 'Body L/D ratio',                    unit: '—',     source: 'user_input',    type: 'input',   dependsOn: [],        locked: false, engine: 'penetration', path: 'shared' },
+    70→  { name: 'lhd_ratio',   symbol: 'lгч/d',   descriptionAr: 'نسبة طول الرأس للقطر',            descriptionEn: 'Nose L/D ratio',                    unit: '—',     source: 'user_input',    type: 'input',   dependsOn: [],        locked: false, engine: 'penetration', path: 'shared' },
+    71→  { name: 'C',           symbol: 'C',       descriptionAr: 'وزن الشحنة المتفجرة',              descriptionEn: 'Explosive charge weight',           unit: 'kg',    source: 'user_input',    type: 'input',   dependsOn: [],        locked: false, engine: 'penetration', path: 'shared' },
+    72→  { name: 'V',           symbol: 'V',       descriptionAr: 'سرعة اصطدام القنبلة',              descriptionEn: 'Impact velocity',                   unit: 'm/s',   source: 'user_input',    type: 'input',   dependsOn: [],        locked: false, engine: 'penetration', path: 'shared' },
+    73→  { name: 'alpha',       symbol: 'α',       descriptionAr: 'زاوية الاصطدام',                   descriptionEn: 'Impact angle',                      unit: 'deg',   source: 'user_input',    type: 'input',   dependsOn: [],        locked: false, engine: 'penetration', path: 'shared' },
+    74→  { name: 'beta',        symbol: 'β',       descriptionAr: 'زاوية ميول الجبل',                 descriptionEn: 'Slope angle',                       unit: 'deg',   source: 'user_input',    type: 'input',   dependsOn: [],        locked: false, engine: 'penetration', path: 'shared' },
+    75→  { name: 'Z',           symbol: 'Z',       descriptionAr: 'عمق توضع المنشأة',                 descriptionEn: 'Facility depth',                    unit: 'm',     source: 'user_input',    type: 'input',   dependsOn: [],        locked: false, engine: 'penetration', path: 'shared' },
+    76→
+    77→  // ──────────────────────────────────────────────────────────────────
+    78→  // القسم 2: معاملات التربة والمواد (lookup)
+    79→  // ──────────────────────────────────────────────────────────────────
+    80→  { name: 'K1',          symbol: 'K1',      descriptionAr: 'معامل المادة المتفجرة',            descriptionEn: 'Explosive coefficient',             unit: '—',     source: 'table_3',       type: 'lookup',  dependsOn: [],        locked: false, engine: 'penetration', path: 'shared' },
+    81→  { name: 'kpr_g',       symbol: 'kпр.г',   descriptionAr: 'معامل اختراق التربة',             descriptionEn: 'Soil penetration coeff',            unit: '—',     source: 'table_4',       type: 'lookup',  dependsOn: [],        locked: false, engine: 'penetration', path: 'shared' },
+    82→  { name: 'kpr_b',       symbol: 'kпр.б',   descriptionAr: 'معامل اختراق البيتون',            descriptionEn: 'Concrete penetration coeff',        unit: '—',     source: 'table_4',       type: 'lookup',  dependsOn: [],        locked: false, engine: 'structural',  path: 'shared' },
+    83→  { name: 'kpr_bt',      symbol: 'kпр.бt',  descriptionAr: 'معامل اختراق البلاطة',            descriptionEn: 'Slab penetration coeff',            unit: '—',     source: 'table_4',       type: 'lookup',  dependsOn: [],        locked: false, engine: 'structural',  path: 'shared' },
+    84→  { name: 'K_kp_ct',     symbol: 'Kkp.ct',  descriptionAr: 'معامل تدمير الجدار',              descriptionEn: 'Wall destruction coeff',            unit: '—',     source: 'table_4',       type: 'lookup',  dependsOn: [],        locked: false, engine: 'structural',  path: 'wall' },
+    85→  { name: 'm1',          symbol: 'm1',      descriptionAr: 'معامل الإجهاد',                    descriptionEn: 'Stress parameter',                  unit: '—',     source: 'table_I3',      type: 'lookup',  dependsOn: [],        locked: false, engine: 'blast',       path: 'shared' },
+    86→  { name: 'RbH',         symbol: 'RbH',     descriptionAr: 'مقاومة ضغط الخرسانة',              descriptionEn: 'Concrete compressive strength',     unit: 'kg/cm2',source: 'table_6',       type: 'lookup',  dependsOn: [],        locked: false, engine: 'structural',  path: 'shared' },
+    87→  { name: 'RsH',         symbol: 'RsH',     descriptionAr: 'إجهاد خضوع الحديد',                descriptionEn: 'Steel yield strength',              unit: 'kg/cm2',source: 'table_7',       type: 'lookup',  dependsOn: [],        locked: false, engine: 'structural',  path: 'shared' },
+    88→  { name: 'gamma_b',     symbol: 'γб',      descriptionAr: 'الوزن الحجمي للخرسانة',            descriptionEn: 'Concrete density',                  unit: 'kg/m3', source: 'table_4',       type: 'lookup',  dependsOn: [],        locked: false, engine: 'structural',  path: 'shared' },
+    89→  { name: 'gamma_g',     symbol: 'γг',      descriptionAr: 'الوزن الحجمي للتربة',              descriptionEn: 'Soil density',                      unit: 'kg/m3', source: 'table_4',       type: 'lookup',  dependsOn: [],        locked: false, engine: 'blast',       path: 'shared' },
+    90→  { name: 'Kpod_b',      symbol: 'Kпод.b',  descriptionAr: 'معامل الزيادة الديناميكية بيتون', descriptionEn: 'DIF concrete',                     unit: '—',     source: 'ufc',           type: 'lookup',  dependsOn: [],        locked: false, engine: 'structural',  path: 'shared' },
+    91→  { name: 'Kpod_s',      symbol: 'Kпод.s',  descriptionAr: 'معامل الزيادة الديناميكية حديد',  descriptionEn: 'DIF steel',                       unit: '—',     source: 'ufc',           type: 'lookup',  dependsOn: [],        locked: false, engine: 'structural',  path: 'shared' },
+    92→  { name: 'n0',          symbol: 'n0',      descriptionAr: 'معامل الأمان',                     descriptionEn: 'Safety factor',                     unit: '—',     source: 'code',          type: 'lookup',  dependsOn: [],        locked: false, engine: 'structural',  path: 'shared' },
+    93→  { name: 'Kbt_bt',      symbol: 'Kвt.бt',  descriptionAr: 'معامل التصدع للبلاطة',            descriptionEn: 'Slab cracking coeff',               unit: '—',     source: 'table_4',       type: 'lookup',  dependsOn: [],        locked: false, engine: 'structural',  path: 'roof' },
+    94→  { name: 'R_bar',       symbol: 'R̽¯',     descriptionAr: 'معامل البعد المكافئ (اختراق)',     descriptionEn: 'Scaled radius (penetration)',       unit: '—',     source: 'table_5',       type: 'lookup',  dependsOn: ['h_z_bar'],locked: false,engine: 'penetration', path: 'shared' },
+    95→
+    96→  // ──────────────────────────────────────────────────────────────────
+    97→  // القسم 3: أبعاد المنشأة (input)
+    98→  // ──────────────────────────────────────────────────────────────────
+    99→  { name: 'a_et',        symbol: 'aэt',     descriptionAr: 'ارتفاع السقف',                    descriptionEn: 'Ceiling height',                    unit: 'm',     source: 'user_input',    type: 'input',   dependsOn: [],        locked: false, engine: 'blast',       path: 'shared' },
+   100→  { name: 'bp',          symbol: 'bp',      descriptionAr: 'المجاز الطويل',                    descriptionEn: 'Long span',                         unit: 'm',     source: 'user_input',    type: 'input',   dependsOn: [],        locked: false, engine: 'structural',  path: 'shared' },
+   101→  { name: 'ap',          symbol: 'ap',      descriptionAr: 'المجاز القصير',                    descriptionEn: 'Short span',                        unit: 'm',     source: 'user_input',    type: 'input',   dependsOn: [],        locked: false, engine: 'structural',  path: 'shared' },
+   102→  { name: 'Lk',          symbol: 'Lk',      descriptionAr: 'طول المنشأة',                      descriptionEn: 'Facility length',                   unit: 'm',     source: 'user_input',    type: 'input',   dependsOn: [],        locked: false, engine: 'structural',  path: 'shared' },
+   103→  { name: 'Bk',          symbol: 'Bk',      descriptionAr: 'عرض المنشأة',                      descriptionEn: 'Facility width',                    unit: 'm',     source: 'user_input',    type: 'input',   dependsOn: [],        locked: false, engine: 'structural',  path: 'shared' },
+   104→  { name: 'Pk',          symbol: 'Pk',      descriptionAr: 'الوزن الكلي',                      descriptionEn: 'Total weight',                      unit: 't',     source: 'user_input',    type: 'input',   dependsOn: [],        locked: false, engine: 'structural',  path: 'shared' },
+   105→  { name: 'Hct',         symbol: 'Hct',     descriptionAr: 'سماكة الجدار الخارجي',             descriptionEn: 'Outer wall thickness',              unit: 'cm',    source: 'user_input',    type: 'input',   dependsOn: [],        locked: false, engine: 'structural',  path: 'wall' },
+   106→  { name: 'Hvct',        symbol: 'Hвct',    descriptionAr: 'سماكة الجدران الداخلية',           descriptionEn: 'Inner wall thickness',              unit: 'cm',    source: 'user_input',    type: 'input',   dependsOn: [],        locked: false, engine: 'structural',  path: 'wall' },
+   107→  { name: 'Hf',          symbol: 'Hф',      descriptionAr: 'سماكة الأرضية',                    descriptionEn: 'Floor thickness',                   unit: 'cm',    source: 'user_input',    type: 'input',   dependsOn: [],        locked: false, engine: 'structural',  path: 'shared' },
+   108→  { name: 'Hp',          symbol: 'Hп',      descriptionAr: 'سماكة السقف',                      descriptionEn: 'Ceiling thickness',                 unit: 'cm',    source: 'user_input',    type: 'input',   dependsOn: [],        locked: false, engine: 'structural',  path: 'roof' },
+   109→  { name: 'h_obs',       symbol: 'hoбc',    descriptionAr: 'سماكة طبقة التمويه',               descriptionEn: 'Concealment thickness',             unit: 'm',     source: 'user_input',    type: 'input',   dependsOn: [],        locked: false, engine: 'blast',       path: 'shared' },
+   110→  { name: 'psi_p',       symbol: 'ψп',      descriptionAr: 'معامل ديناميكي للسقف',             descriptionEn: 'Dynamic coeff ceiling',             unit: '—',     source: 'user_input',    type: 'input',   dependsOn: [],        locked: false, engine: 'blast',       path: 'roof' },
+   111→  { name: 'Ea',          symbol: 'Ea',      descriptionAr: 'معامل المرونة للحديد',              descriptionEn: 'Steel elastic modulus',             unit: 'kg/cm2',source: 'user_input',    type: 'input',   dependsOn: [],        locked: false, engine: 'structural',  path: 'shared' },
+   112→  { name: 'xi',          symbol: 'ξ',       descriptionAr: 'نسبة التسليح',                      descriptionEn: 'Reinforcement ratio',               unit: '—',     source: 'user_input',    type: 'input',   dependsOn: [],        locked: false, engine: 'structural',  path: 'shared' },
+   113→  { name: 'rho_pc',      symbol: 'ρp.c',    descriptionAr: 'معامل طبقة توزيع الضغط',            descriptionEn: 'Distribution layer param',          unit: '—',     source: 'user_input',    type: 'input',   dependsOn: [],        locked: false, engine: 'blast',       path: 'roof' },
+   114→  { name: 'rho_g',       symbol: 'ρг',      descriptionAr: 'معامل التربة حول الجدار',           descriptionEn: 'Soil around wall param',            unit: '—',     source: 'user_input',    type: 'input',   dependsOn: [],        locked: false, engine: 'blast',       path: 'wall' },
+   115→
+   116→  // ──────────────────────────────────────────────────────────────────
+   117→  // القسم 4: محسوبات الاختراق (computed + locked)
+   118→  // ──────────────────────────────────────────────────────────────────
+   119→  { name: 'C_ef',        symbol: 'Cэф',     descriptionAr: 'الشحنة الفعالة',                   descriptionEn: 'Effective charge',                  unit: 'kg',    source: 'step2',         type: 'locked',  dependsOn: ['K1','C'], locked: true, engine: 'penetration', path: 'shared', formula: 'K1*0.95*C' },
+   120→  { name: 'lambda1',     symbol: 'λ1',      descriptionAr: 'معامل شكل الرأس',                  descriptionEn: 'Nose shape coeff',                  unit: '—',     source: 'step2',         type: 'computed',dependsOn: ['lhd_ratio'],locked: false,engine: 'penetration', path: 'shared', formula: '0.5+0.4*(lгч/d)^0.666' },
+   121→  { name: 'lambda2',     symbol: 'λ2',      descriptionAr: 'معامل تأثير القطر',                descriptionEn: 'Diameter coeff',                    unit: '—',     source: 'step2',         type: 'computed',dependsOn: ['dk'],      locked: false,engine: 'penetration', path: 'shared', formula: '2.8*(d)^0.333-1.3*(d)^0.5' },
+   122→  { name: 'h_pr',        symbol: 'hпр',     descriptionAr: 'عمق اختراق القنبلة',               descriptionEn: 'Penetration depth',                 unit: 'm',     source: 'step2',         type: 'locked',  dependsOn: ['lambda1','lambda2','kpr_g','P','dk','V','alpha'], locked: true, engine: 'penetration', path: 'shared', formula: 'λ1*λ2*kпр.г*P/d²*V*cosα' },
+   123→  { name: 'R_actual',    symbol: 'R̽',      descriptionAr: 'البعد الفعلي لمركز الانفجار',      descriptionEn: 'Actual blast radius',               unit: 'm',     source: 'step2',         type: 'locked',  dependsOn: ['R_bar','C_ef'], locked: true, engine: 'penetration', path: 'shared', formula: 'R̽¯*(Cэф)^0.333' },
+   124→  { name: 'tsu',         symbol: 'ц',       descriptionAr: 'إزاحة مركز الانفجار',              descriptionEn: 'Blast center offset',               unit: 'm',     source: 'step2',         type: 'computed',dependsOn: ['lk','alpha'],locked: false,engine: 'penetration', path: 'shared', formula: '0.5*lk*cosα' },
+   125→  { name: 'H_total',     symbol: 'H',       descriptionAr: 'الارتفاع حتى سطح الجبل',           descriptionEn: 'Height to surface',                 unit: 'm',     source: 'step2',         type: 'computed',dependsOn: ['R_actual','h_pr','tsu'], locked: false, engine: 'penetration', path: 'shared', formula: 'R̽+hпр-ц' },
+   126→  { name: 'h_z',         symbol: 'hз',      descriptionAr: 'عمق ما دون الحفرة',                descriptionEn: 'Depth below crater',                unit: 'm',     source: 'step2',         type: 'computed',dependsOn: ['h_pr','tsu'], locked: false, engine: 'penetration', path: 'shared', formula: 'hпр-ц' },
+   127→  { name: 'h_z_bar',     symbol: 'hз¯',     descriptionAr: 'العمق المكافئ المختزل',            descriptionEn: 'Normalized depth',                  unit: '—',     source: 'step2',         type: 'computed',dependsOn: ['h_z','C_ef'], locked: false, engine: 'penetration', path: 'shared', formula: 'hз/(Cэф)^0.333' },
+   128→  { name: 'Zp',          symbol: 'Zp',      descriptionAr: 'عمق التربة المكافئ',               descriptionEn: 'Equivalent soil depth',             unit: 'm',     source: 'step2',         type: 'locked',  dependsOn: ['kpr_g','C_ef'], locked: true, engine: 'penetration', path: 'shared', formula: '1.5*kпр.г*(Cэф)^0.333' },
+   129→  { name: 'L_tunnel',    symbol: 'L',       descriptionAr: 'طول المدخل الديناميكي',            descriptionEn: 'Dynamic entrance length',           unit: 'm',     source: 'step2',         type: 'computed',dependsOn: ['H_total','beta'], locked: false, engine: 'penetration', path: 'shared', formula: 'H/tanβ' },
+   130→  { name: 'Y_diff',      symbol: 'Y',       descriptionAr: 'فرق التوضع والاختراق',             descriptionEn: 'Depth difference',                  unit: 'm',     source: 'step2',         type: 'computed',dependsOn: ['Z','h_pr'], locked: false, engine: 'penetration', path: 'shared', formula: 'Z-hпр' },
+   131→  { name: 'hb_destruction',symbol:'hb.dest', descriptionAr: 'سماكة البيتون للتدمير',            descriptionEn: 'Thickness for destruction',         unit: 'm',     source: 'step2',         type: 'computed',dependsOn: ['Zp','Y_diff'], locked: false, engine: 'penetration', path: 'shared' },
+   132→  { name: 'hb_cracking', symbol: 'hb.crack',descriptionAr: 'سماكة البيتون للتصدع',             descriptionEn: 'Thickness for cracking',            unit: 'm',     source: 'step2',         type: 'computed',dependsOn: ['Zot_rock','Y_diff'], locked: false, engine: 'penetration', path: 'shared' },
+   133→  { name: 'Zot_rock',    symbol: 'Zot.rock',descriptionAr: 'عمق التصدع الصخري',                descriptionEn: 'Rock cracking depth',               unit: 'm',     source: 'step2',         type: 'computed',dependsOn: ['C_ef'],   locked: false, engine: 'penetration', path: 'shared' },
+   134→
+   135→  // ──────────────────────────────────────────────────────────────────
+   136→  // القسم 5: مسار السقف — الانفجار (computed + locked)
+   137→  // ──────────────────────────────────────────────────────────────────
+   138→  { name: 'ht',          symbol: 'ht',      descriptionAr: 'سماكة بلاطة الحماية',              descriptionEn: 'Protection slab thickness',         unit: 'cm',    source: 'step5_roof',    type: 'locked',  dependsOn: [],        locked: true,  engine: 'blast',       path: 'roof' },
+   139→  { name: 'Bt',          symbol: 'Bt',      descriptionAr: 'بروز بلاطة الحماية',               descriptionEn: 'Slab projection',                   unit: 'm',     source: 'step5_roof',    type: 'locked',  dependsOn: [],        locked: true,  engine: 'blast',       path: 'roof' },
+   140→  { name: 'Hpc',         symbol: 'Hp.c',    descriptionAr: 'سماكة طبقة توزيع الضغط',           descriptionEn: 'Distribution thickness',            unit: 'm',     source: 'step5_roof',    type: 'locked',  dependsOn: [],        locked: true,  engine: 'blast',       path: 'roof' },
+   141→  { name: 'R0_roof',     symbol: 'R0',      descriptionAr: 'بعد الانفجار عن السقف',            descriptionEn: 'Blast distance to ceiling',         unit: 'm',     source: 'step5_roof',    type: 'computed',dependsOn: [],        locked: false, engine: 'blast',       path: 'roof' },
+   142→  { name: 'R_ekv_roof',  symbol: 'Rэкв',    descriptionAr: 'البعد المكافئ — السقف',            descriptionEn: 'Equivalent radius — roof',          unit: 'm',     source: 'step5_roof',    type: 'locked',  dependsOn: [],        locked: true,  engine: 'blast',       path: 'roof' },
+   143→  { name: 'R_star_roof', symbol: 'R*',      descriptionAr: 'البعد الفعال — السقف',             descriptionEn: 'Effective radius — roof',           unit: 'm',     source: 'step5_roof',    type: 'computed',dependsOn: [],        locked: false, engine: 'blast',       path: 'roof' },
+   144→  { name: 'max_bv_roof', symbol: 'maxбв',   descriptionAr: 'الإجهاد الأقصى — السقف',           descriptionEn: 'Max soil stress — roof',            unit: 'kg/cm2',source: 'step5_roof',    type: 'computed',dependsOn: [],        locked: false, engine: 'blast',       path: 'roof' },
+   145→  { name: 'tau_roof',    symbol: 'τ',       descriptionAr: 'زمن تأثير الحمل — السقف',          descriptionEn: 'Load duration — roof',              unit: 's',     source: 'step5_roof',    type: 'computed',dependsOn: [],        locked: false, engine: 'blast',       path: 'roof' },
+   146→  { name: 'tau_ef_roof', symbol: 'τэф',     descriptionAr: 'الزمن الفعال — السقف',             descriptionEn: 'Effective duration — roof',         unit: 's',     source: 'step5_roof',    type: 'locked',  dependsOn: [],        locked: true,  engine: 'blast',       path: 'roof' },
+   147→  { name: 'tau_n_roof',  symbol: 'τн',      descriptionAr: 'زمن تصاعد الضغط — السقف',          descriptionEn: 'Rise time — roof',                  unit: 's',     source: 'step5_roof',    type: 'computed',dependsOn: [],        locked: false, engine: 'blast',       path: 'roof' },
+   148→  { name: 'Zp_roof',     symbol: 'Zп',      descriptionAr: 'البعد المختزل — السقف',            descriptionEn: 'Scaled distance — roof',            unit: 'm',     source: 'step5_roof',    type: 'computed',dependsOn: [],        locked: false, engine: 'blast',       path: 'roof' },
+   149→  { name: 'a0cp_roof',   symbol: 'a0cp',    descriptionAr: 'سرعة الموجة P — السقف',            descriptionEn: 'P-wave velocity — roof',            unit: 'm/s',   source: 'step5_roof',    type: 'computed',dependsOn: [],        locked: false, engine: 'blast',       path: 'roof' },
+   150→  { name: 'a1cp_roof',   symbol: 'a1cp',    descriptionAr: 'سرعة الموجة S — السقف',            descriptionEn: 'S-wave velocity — roof',            unit: 'm/s',   source: 'step5_roof',    type: 'computed',dependsOn: [],        locked: false, engine: 'blast',       path: 'roof' },
+   151→
+   152→  // ──────────────────────────────────────────────────────────────────
+   153→  // القسم 6: مسار الجدار — الانفجار (computed + locked)
+   154→  // ──────────────────────────────────────────────────────────────────
+   155→  { name: 'Z_wall',      symbol: 'Zc',      descriptionAr: 'البعد حتى الجدار',                 descriptionEn: 'Distance to wall',                  unit: 'm',     source: 'step5_wall',    type: 'computed',dependsOn: [],        locked: false, engine: 'blast',       path: 'wall' },
+   156→  { name: 'h_b',         symbol: 'hб',      descriptionAr: 'سماكة البيتون — الجدار',           descriptionEn: 'Concrete thickness — wall',         unit: 'm',     source: 'step5_wall',    type: 'computed',dependsOn: [],        locked: false, engine: 'blast',       path: 'wall' },
+   157→  { name: 'tau_theta',   symbol: 'τθ',      descriptionAr: 'معامل زاوي — الجدار',              descriptionEn: 'Angle time factor — wall',          unit: '—',     source: 'step5_wall',    type: 'computed',dependsOn: [],        locked: false, engine: 'blast',       path: 'wall' },
+   158→  { name: 'h_exp_wall',  symbol: 'h̄.wall',  descriptionAr: 'ارتفاع التعرض — الجدار',           descriptionEn: 'Exposure height — wall',            unit: '—',     source: 'step5_wall',    type: 'computed',dependsOn: [],        locked: false, engine: 'blast',       path: 'wall' },
+   159→  { name: 'R_ekv_wall',  symbol: 'Rэкв.wall',descriptionAr:'البعد المكافئ — الجدار',           descriptionEn: 'Equivalent radius — wall',          unit: 'm',     source: 'step5_wall',    type: 'locked',  dependsOn: [],        locked: true,  engine: 'blast',       path: 'wall' },
+   160→  { name: 'R_star_wall', symbol: 'R*.wall',  descriptionAr: 'البعد الفعال — الجدار',            descriptionEn: 'Effective radius — wall',           unit: 'm',     source: 'step5_wall',    type: 'computed',dependsOn: [],        locked: false, engine: 'blast',       path: 'wall' },
+   161→  { name: 'max_bv_wall', symbol: 'maxбв.wall',descriptionAr:'الإجهاد الأقصى — الجدار',          descriptionEn: 'Max soil stress — wall',            unit: 'kg/cm2',source: 'step5_wall',    type: 'computed',dependsOn: [],        locked: false, engine: 'blast',       path: 'wall' },
+   162→  { name: 'tau_wall',    symbol: 'τ.wall',  descriptionAr: 'زمن تأثير الحمل — الجدار',         descriptionEn: 'Load duration — wall',              unit: 's',     source: 'step5_wall',    type: 'computed',dependsOn: [],        locked: false, engine: 'blast',       path: 'wall' },
+   163→  { name: 'tau_ef_wall', symbol: 'τэф.wall', descriptionAr: 'الزمن الفعال — الجدار',            descriptionEn: 'Effective duration — wall',         unit: 's',     source: 'step5_wall',    type: 'locked',  dependsOn: [],        locked: true,  engine: 'blast',       path: 'wall' },
+   164→  { name: 'tau_n_wall',  symbol: 'τн.wall', descriptionAr: 'زمن تصاعد الضغط — الجدار',         descriptionEn: 'Rise time — wall',                  unit: 's',     source: 'step5_wall',    type: 'computed',dependsOn: [],        locked: false, engine: 'blast',       path: 'wall' },
+   165→  { name: 'a0cp_wall',   symbol: 'a0cp.wall',descriptionAr:'سرعة الموجة P — الجدار',           descriptionEn: 'P-wave velocity — wall',            unit: 'm/s',   source: 'step5_wall',    type: 'computed',dependsOn: [],        locked: false, engine: 'blast',       path: 'wall' },
+   166→  { name: 'a1cp_wall',   symbol: 'a1cp.wall',descriptionAr:'سرعة الموجة S — الجدار',           descriptionEn: 'S-wave velocity — wall',            unit: 'm/s',   source: 'step5_wall',    type: 'computed',dependsOn: [],        locked: false, engine: 'blast',       path: 'wall' },
+   167→
+   168→  // ──────────────────────────────────────────────────────────────────
+   169→  // القسم 7: القيم الحاكمة — الأحمال (locked)
+   170→  // ──────────────────────────────────────────────────────────────────
+   171→  { name: 'omega_roof',  symbol: 'ω.roof',  descriptionAr: 'التردد الدائري — السقف',          descriptionEn: 'Circular frequency — roof',         unit: 's-1',   source: 'step5',         type: 'locked',  dependsOn: [],        locked: true,  engine: 'blast',       path: 'roof' },
+   172→  { name: 'omega_wall',  symbol: 'ω.wall',  descriptionAr: 'التردد الدائري — الجدار',         descriptionEn: 'Circular frequency — wall',         unit: 's-1',   source: 'step8',         type: 'locked',  dependsOn: [],        locked: true,  engine: 'blast',       path: 'wall' },
+   173→  { name: 'C_dyn_roof',  symbol: 'Cд.roof', descriptionAr: 'معامل الديناميكية — السقف',       descriptionEn: 'Dynamic coeff — roof',              unit: '—',     source: 'step5',         type: 'computed',dependsOn: [],        locked: false, engine: 'blast',       path: 'roof' },
+   174→  { name: 'C_dyn_wall',  symbol: 'Cд.wall', descriptionAr: 'معامل الديناميكية — الجدار',      descriptionEn: 'Dynamic coeff — wall',              unit: '—',     source: 'step8',         type: 'computed',dependsOn: [],        locked: false, engine: 'blast',       path: 'wall' },
+   175→  { name: 'mu_struct_roof',symbol:'μ.roof', descriptionAr: 'معامل المطاوعة الإنشائي — السقف', descriptionEn: 'Structural ductility — roof',      unit: '—',     source: 'step5',         type: 'computed',dependsOn: [],        locked: false, engine: 'structural',  path: 'roof' },
+   176→  { name: 'mu_struct_wall',symbol:'μ.wall', descriptionAr: 'معامل المطاوعة الإنشائي — الجدار',descriptionEn: 'Structural ductility — wall',      unit: '—',     source: 'step8',         type: 'computed',dependsOn: [],        locked: false, engine: 'structural',  path: 'wall' },
+   177→  { name: 'Pmax_roof',   symbol: 'Pmax.roof',descriptionAr:'الضغط الأقصى — السقف',            descriptionEn: 'Maximum pressure — roof',           unit: 'kg/cm2',source: 'step5',         type: 'locked',  dependsOn: [],        locked: true,  engine: 'blast',       path: 'roof' },
+   178→  { name: 'P_ekv_roof',  symbol: 'Pэкв.roof',descriptionAr:'الضغط المكافئ — السقف',           descriptionEn: 'Equivalent pressure — roof',        unit: 'kg/cm2',source: 'step5',         type: 'locked',  dependsOn: [],        locked: true,  engine: 'blast',       path: 'roof' },
+   179→  { name: 'Pp_roof',     symbol: 'Pp.roof', descriptionAr: 'الحمولة الحسابية — السقف',        descriptionEn: 'Design load — roof',                unit: 'kg/cm2',source: 'step5',         type: 'locked',  dependsOn: [],        locked: true,  engine: 'structural',  path: 'roof' },
+   180→  { name: 'Pct_roof',    symbol: 'Pct.roof',descriptionAr: 'حمولة الجدار على السقف',          descriptionEn: 'Wall load on ceiling',              unit: 'kg/cm2',source: 'step5',         type: 'computed',dependsOn: [],        locked: false, engine: 'structural',  path: 'roof' },
+   181→  { name: 'Pmax_wall',   symbol: 'Pmax.wall',descriptionAr:'الضغط الأقصى — الجدار',           descriptionEn: 'Maximum pressure — wall',           unit: 'kg/cm2',source: 'step8',         type: 'locked',  dependsOn: [],        locked: true,  engine: 'blast',       path: 'wall' },
+   182→  { name: 'P_ekv_wall',  symbol: 'Pэкв.wall',descriptionAr:'الضغط المكافئ — الجدار',          descriptionEn: 'Equivalent pressure — wall',        unit: 'kg/cm2',source: 'step8',         type: 'locked',  dependsOn: [],        locked: true,  engine: 'blast',       path: 'wall' },
+   183→  { name: 'Pp_wall',     symbol: 'Pp.wall', descriptionAr: 'الحمولة الحسابية — الجدار',       descriptionEn: 'Design load — wall',                unit: 'kg/cm2',source: 'step8',         type: 'locked',  dependsOn: [],        locked: true,  engine: 'structural',  path: 'wall' },
+   184→  { name: 'Pct_wall',    symbol: 'Pct.wall',descriptionAr: 'حمولة السقف على الجدار',          descriptionEn: 'Ceiling load on wall',              unit: 'kg/cm2',source: 'step8',         type: 'computed',dependsOn: [],        locked: false, engine: 'structural',  path: 'wall' },
+   185→
+   186→  // ──────────────────────────────────────────────────────────────────
+   187→  // القسم 8: معاملات الخطوة 5 — الحمولات (computed)
+   188→  // ──────────────────────────────────────────────────────────────────
+   189→  { name: 'h_bar_roof',  symbol: 'h̄.roof',  descriptionAr: 'الارتفاع المختزل — السقف',        descriptionEn: 'Normalized height — roof',          unit: '—',     source: 'step5_1',       type: 'computed',dependsOn: [],        locked: false, engine: 'blast',       path: 'roof' },
+   190→  { name: 'R_bar_b1_roof',symbol:'R̄̽.roof', descriptionAr: 'معامل البعد من B-1 — السقف',     descriptionEn: 'B-1 radius coeff — roof',           unit: '—',     source: 'step6',         type: 'lookup',  dependsOn: [],        locked: false, engine: 'blast',       path: 'roof' },
+   191→  { name: 'eta_roof',    symbol: 'η.roof',  descriptionAr: 'معامل η — السقف',                  descriptionEn: 'Eta coeff — roof',                  unit: '—',     source: 'step5_6',       type: 'computed',dependsOn: [],        locked: false, engine: 'blast',       path: 'roof' },
+   192→  { name: 'Rsd',         symbol: 'Rsd',     descriptionAr: 'مقاومة الحديد الديناميكية',        descriptionEn: 'Dynamic steel resistance',          unit: 'kg/cm2',source: 'step5_6',       type: 'computed',dependsOn: [],        locked: false, engine: 'structural',  path: 'shared' },
+   193→  { name: 'Rbd',         symbol: 'Rbd',     descriptionAr: 'مقاومة البيتون الديناميكية',       descriptionEn: 'Dynamic concrete resistance',       unit: 'kg/cm2',source: 'step5_6',       type: 'computed',dependsOn: [],        locked: false, engine: 'structural',  path: 'shared' },
+   194→  { name: 'lambda_roof', symbol: 'λ.roof',  descriptionAr: 'معامل λ — السقف',                  descriptionEn: 'Lambda — roof',                     unit: '—',     source: 'step5_7',       type: 'computed',dependsOn: [],        locked: false, engine: 'blast',       path: 'roof' },
+   195→  { name: 'Kp_roof',     symbol: 'Kп.roof', descriptionAr: 'معامل Kп — السقف',                 descriptionEn: 'Kp coeff — roof',                   unit: '—',     source: 'step6',         type: 'lookup',  dependsOn: [],        locked: false, engine: 'blast',       path: 'roof' },
+   196→  { name: 'Kd_roof',     symbol: 'Kд.roof', descriptionAr: 'معامل Kд — السقف',                 descriptionEn: 'Kd coeff — roof',                   unit: '—',     source: 'step6',         type: 'lookup',  dependsOn: [],        locked: false, engine: 'blast',       path: 'roof' },
+   197→  { name: 'kpsi_roof',   symbol: 'kψ.roof', descriptionAr: 'معامل kψ — السقف',                descriptionEn: 'kpsi coeff — roof',                 unit: '—',     source: 'step5_8',       type: 'computed',dependsOn: [],        locked: false, engine: 'blast',       path: 'roof' },
+   198→  { name: 'h_bar_wall',  symbol: 'h̄.wall',  descriptionAr: 'الارتفاع المختزل — الجدار',       descriptionEn: 'Normalized height — wall',          unit: '—',     source: 'step8_2',       type: 'computed',dependsOn: [],        locked: false, engine: 'blast',       path: 'wall' },
+   199→  { name: 'R_bar_b1_wall',symbol:'R̄̽.wall', descriptionAr: 'معامل البعد من B-1 — الجدار',    descriptionEn: 'B-1 radius coeff — wall',           unit: '—',     source: 'step6',         type: 'lookup',  dependsOn: [],        locked: false, engine: 'blast',       path: 'wall' },
+   200→  { name: 'eta_wall',    symbol: 'η.wall',  descriptionAr: 'معامل η — الجدار',                 descriptionEn: 'Eta coeff — wall',                  unit: '—',     source: 'step8_6',       type: 'computed',dependsOn: [],        locked: false, engine: 'blast',       path: 'wall' },
+   201→  { name: 'lambda_wall', symbol: 'λ.wall',  descriptionAr: 'معامل λ — الجدار',                 descriptionEn: 'Lambda — wall',                     unit: '—',     source: 'step8_7',       type: 'computed',dependsOn: [],        locked: false, engine: 'blast',       path: 'wall' },
+   202→  { name: 'Kp_wall',     symbol: 'Kп.wall', descriptionAr: 'معامل Kп — الجدار',                descriptionEn: 'Kp coeff — wall',                   unit: '—',     source: 'step6',         type: 'lookup',  dependsOn: [],        locked: false, engine: 'blast',       path: 'wall' },
+   203→  { name: 'Kd_wall',     symbol: 'Kд.wall', descriptionAr: 'معامل Kд — الجدار',                descriptionEn: 'Kd coeff — wall',                   unit: '—',     source: 'step6',         type: 'lookup',  dependsOn: [],        locked: false, engine: 'blast',       path: 'wall' },
+   204→  { name: 'kpsi_wall',   symbol: 'kψ.wall', descriptionAr: 'معامل kψ — الجدار',               descriptionEn: 'kpsi coeff — wall',                 unit: '—',     source: 'step8_8',       type: 'computed',dependsOn: [],        locked: false, engine: 'blast',       path: 'wall' },
+   205→
+   206→  // ──────────────────────────────────────────────────────────────────
+   207→  // القسم 9: جداول B-1 إلى B-6 — الخطوة 6 (lookup)
+   208→  // ──────────────────────────────────────────────────────────────────
+   209→  { name: 'mu_table_roof', symbol: 'μ.tbl.roof', descriptionAr: 'معامل μ جدول B-2 — السقف',  descriptionEn: 'B-2 mu — roof',                     unit: '—',     source: 'table_B2',      type: 'lookup',  dependsOn: [],        locked: false, engine: 'blast',       path: 'roof' },
+   210→  { name: 'eta_table_roof',symbol: 'η.tbl.roof', descriptionAr: 'معامل η جدول B-2 — السقف',  descriptionEn: 'B-2 eta — roof',                    unit: '—',     source: 'table_B2',      type: 'lookup',  dependsOn: [],        locked: false, engine: 'blast',       path: 'roof' },
+   211→  { name: 'Kt_roof',      symbol: 'Kt.roof',  descriptionAr: 'معامل Kt جدول B-2 — السقف',     descriptionEn: 'B-2 Kt — roof',                     unit: '—',     source: 'table_B2',      type: 'lookup',  dependsOn: [],        locked: false, engine: 'blast',       path: 'roof' },
+   212→  { name: 'a0z_roof',     symbol: 'a0z.roof', descriptionAr: 'سرعة الموجة من B-3 — السقف',    descriptionEn: 'B-3 a0z — roof',                    unit: 'm/s',   source: 'table_B3',      type: 'lookup',  dependsOn: [],        locked: false, engine: 'blast',       path: 'roof' },
+   213→  { name: 'a1z_roof',     symbol: 'a1z.roof', descriptionAr: 'سرعة الموجة من B-3 — السقف',    descriptionEn: 'B-3 a1z — roof',                    unit: 'm/s',   source: 'table_B3',      type: 'lookup',  dependsOn: [],        locked: false, engine: 'blast',       path: 'roof' },
+   214→  { name: 'Kpod_roof',    symbol: 'Kпод.roof',descriptionAr: 'معامل Kпод جدول B-4 — السقف',   descriptionEn: 'B-4 Kpod — roof',                   unit: '—',     source: 'table_B4',      type: 'lookup',  dependsOn: [],        locked: false, engine: 'blast',       path: 'roof' },
+   215→  { name: 'mu_table_wall', symbol: 'μ.tbl.wall', descriptionAr: 'معامل μ جدول B-2 — الجدار', descriptionEn: 'B-2 mu — wall',                     unit: '—',     source: 'table_B2',      type: 'lookup',  dependsOn: [],        locked: false, engine: 'blast',       path: 'wall' },
+   216→  { name: 'eta_table_wall',symbol: 'η.tbl.wall', descriptionAr: 'معامل η جدول B-2 — الجدار', descriptionEn: 'B-2 eta — wall',                    unit: '—',     source: 'table_B2',      type: 'lookup',  dependsOn: [],        locked: false, engine: 'blast',       path: 'wall' },
+   217→  { name: 'Kt_wall',      symbol: 'Kt.wall',  descriptionAr: 'معامل Kt جدول B-2 — الجدار',    descriptionEn: 'B-2 Kt — wall',                     unit: '—',     source: 'table_B2',      type: 'lookup',  dependsOn: [],        locked: false, engine: 'blast',       path: 'wall' },
+   218→  { name: 'a0z_wall',     symbol: 'a0z.wall', descriptionAr: 'سرعة الموجة من B-3 — الجدار',   descriptionEn: 'B-3 a0z — wall',                    unit: 'm/s',   source: 'table_B3',      type: 'lookup',  dependsOn: [],        locked: false, engine: 'blast',       path: 'wall' },
+   219→  { name: 'a1z_wall',     symbol: 'a1z.wall', descriptionAr: 'سرعة الموجة من B-3 — الجدار',   descriptionEn: 'B-3 a1z — wall',                    unit: 'm/s',   source: 'table_B3',      type: 'lookup',  dependsOn: [],        locked: false, engine: 'blast',       path: 'wall' },
+   220→  { name: 'Kpod_wall',    symbol: 'Kпод.wall',descriptionAr: 'معامل Kпод جدول B-4 — الجدار',  descriptionEn: 'B-4 Kpod — wall',                   unit: '—',     source: 'table_B4',      type: 'lookup',  dependsOn: [],        locked: false, engine: 'blast',       path: 'wall' },
+   221→
+   222→  // ──────────────────────────────────────────────────────────────────
+   223→  // القسم 10: العزوم (locked) — الخطوتان 7 و 8
+   224→  // ──────────────────────────────────────────────────────────────────
+   225→  { name: 'Mp_roof',      symbol: 'Mp.roof', descriptionAr: 'العزم الأكبر للسقف',             descriptionEn: 'Max moment — roof',                 unit: 'kg.cm', source: 'step7',         type: 'locked',  dependsOn: [],        locked: true,  engine: 'structural',  path: 'roof' },
+   226→  { name: 'Mp_wall',      symbol: 'Mp.wall', descriptionAr: 'العزم الأكبر للجدار',            descriptionEn: 'Max moment — wall',                 unit: 'kg.cm', source: 'step8',         type: 'locked',  dependsOn: [],        locked: true,  engine: 'structural',  path: 'wall' },
+   227→  { name: 'h0_ceiling',   symbol: 'h0',      descriptionAr: 'العمق الفعال للسقف',              descriptionEn: 'Effective depth — ceiling',         unit: 'cm',    source: 'step7',         type: 'computed',dependsOn: [],        locked: false, engine: 'structural',  path: 'roof', formula: 'h0 = f(Mp,μ,Rsd)' },
+   228→
+   229→  // ──────────────────────────────────────────────────────────────────
+   230→  // القسم 11: المخرجات النهائية — الخطوتان 7 و 8 (output)
+   231→  // ──────────────────────────────────────────────────────────────────
+   232→  { name: 'Hp_final',     symbol: 'Hп.final',descriptionAr: 'سماكة السقف النهائية',            descriptionEn: 'Final ceiling thickness',           unit: 'cm',    source: 'step7',         type: 'output',  dependsOn: ['h0_ceiling'], locked: false, engine: 'structural', path: 'roof', formula: 'h0*1.05' },
+   233→  { name: 'Hc_final',     symbol: 'Hc.final',descriptionAr: 'سماكة الجدار النهائية',           descriptionEn: 'Final wall thickness',              unit: 'cm',    source: 'step8',         type: 'output',  dependsOn: [],        locked: false, engine: 'structural',  path: 'wall' },
+   234→  { name: 'Hf_final',     symbol: 'Hф.final',descriptionAr: 'سماكة الأرضية النهائية',          descriptionEn: 'Final floor thickness',             unit: 'cm',    source: 'step8',         type: 'output',  dependsOn: [],        locked: false, engine: 'structural',  path: 'shared' },
+   235→  { name: 'Hvct_final',   symbol: 'Hвc.final',descriptionAr:'سماكة الجدران الداخلية النهائية', descriptionEn: 'Final inner wall thickness',       unit: 'cm',    source: 'step8',         type: 'output',  dependsOn: [],        locked: false, engine: 'structural',  path: 'wall' },
+   236→  { name: 'status_final', symbol: 'status',  descriptionAr: 'حالة التحقق النهائي',             descriptionEn: 'Final verification status',         unit: '—',     source: 'step8',         type: 'output',  dependsOn: [],        locked: false, engine: 'structural',  path: 'shared' },
+   237→];
+   238→
+   239→// ═══════════════════════════════════════════════════════════════════════
+   240→// سجلّ القيم المقفلة — للقراءة فقط بين المحركات
+   241→// ═══════════════════════════════════════════════════════════════════════
+   242→
+   243→export const LOCKED_VARIABLES = UNIFIED_VARIABLE_TABLE.filter(v => v.locked);
+   244→export const LOCKED_VARIABLE_NAMES = LOCKED_VARIABLES.map(v => v.name);
+   245→
+   246→export const LOCKED_REGISTRY: Record<string, {
+   247→  readonly producedBy: EngineName;
+   248→  readonly consumedBy: EngineName[];
+   249→  readonly path: PathType;
+   250→  readonly symbol: string;
+   251→}> = {
+   252→  C_ef:          { producedBy: 'penetration', consumedBy: ['blast'],               path: 'shared', symbol: 'Cэф' },
+   253→  h_pr:          { producedBy: 'penetration', consumedBy: ['blast'],               path: 'shared', symbol: 'hпр' },
+   254→  R_actual:      { producedBy: 'penetration', consumedBy: ['blast'],               path: 'shared', symbol: 'R̽' },
+   255→  Zp:            { producedBy: 'penetration', consumedBy: ['blast','structural'],  path: 'shared', symbol: 'Zp' },
+   256→  ht:            { producedBy: 'blast',       consumedBy: ['structural'],          path: 'roof',   symbol: 'ht' },
+   257→  Bt:            { producedBy: 'blast',       consumedBy: ['structural'],          path: 'roof',   symbol: 'Bt' },
+   258→  Hpc:           { producedBy: 'blast',       consumedBy: ['structural'],          path: 'roof',   symbol: 'Hp.c' },
+   259→  R_ekv_roof:    { producedBy: 'blast',       consumedBy: ['structural'],          path: 'roof',   symbol: 'Rэкв' },
+   260→  tau_ef_roof:   { producedBy: 'blast',       consumedBy: ['blast','structural'],  path: 'roof',   symbol: 'τэф' },
+   261→  tau_ef_wall:   { producedBy: 'blast',       consumedBy: ['blast','structural'],  path: 'wall',   symbol: 'τэф.wall' },
+   262→  omega_roof:    { producedBy: 'blast',       consumedBy: ['blast','structural'],  path: 'roof',   symbol: 'ω.roof' },
+   263→  omega_wall:    { producedBy: 'blast',       consumedBy: ['blast','structural'],  path: 'wall',   symbol: 'ω.wall' },
+   264→  Pmax_roof:     { producedBy: 'blast',       consumedBy: ['structural'],          path: 'roof',   symbol: 'Pmax.roof' },
+   265→  P_ekv_roof:    { producedBy: 'blast',       consumedBy: ['structural'],          path: 'roof',   symbol: 'Pэкв.roof' },
+   266→  Pp_roof:       { producedBy: 'structural',  consumedBy: ['structural'],          path: 'roof',   symbol: 'Pp.roof' },
+   267→  Pmax_wall:     { producedBy: 'blast',       consumedBy: ['structural'],          path: 'wall',   symbol: 'Pmax.wall' },
+   268→  P_ekv_wall:    { producedBy: 'blast',       consumedBy: ['structural'],          path: 'wall',   symbol: 'Pэкв.wall' },
+   269→  Pp_wall:       { producedBy: 'structural',  consumedBy: ['structural'],          path: 'wall',   symbol: 'Pp.wall' },
+   270→  Mp_roof:       { producedBy: 'structural',  consumedBy: ['structural'],          path: 'roof',   symbol: 'Mp.roof' },
+   271→  Mp_wall:       { producedBy: 'structural',  consumedBy: ['structural'],          path: 'wall',   symbol: 'Mp.wall' },
+   272→} as const;
+   273→
+   274→// ═══════════════════════════════════════════════════════════════════════
+   275→// حدود المحركات
+   276→// ═══════════════════════════════════════════════════════════════════════
+   277→
+   278→export const ENGINE_BOUNDARIES: EngineBoundary = {
+   279→  penetrationToBlast: ['C_ef', 'h_pr', 'R_actual', 'Zp'],
+   280→  blastRoofToStructural: ['tau_ef_roof', 'omega_roof', 'Pmax_roof', 'P_ekv_roof', 'Pp_roof', 'Bt', 'ht', 'Hpc', 'R_ekv_roof'],
+   281→  blastWallToStructural: ['tau_ef_wall', 'omega_wall', 'Pmax_wall', 'P_ekv_wall', 'Pp_wall', 'R_ekv_wall'],
+   282→  withinBlastRoof: ['tau_ef_roof', 'omega_roof', 'C_dyn_roof', 'Pmax_roof', 'P_ekv_roof'],
+   283→  withinBlastWall: ['tau_ef_wall', 'omega_wall', 'C_dyn_wall', 'Pmax_wall', 'P_ekv_wall'],
+   284→} as const;
+   285→
+   286→// ═══════════════════════════════════════════════════════════════════════
+   287→// الرسم البياني للاعتماديات
+   288→// ═══════════════════════════════════════════════════════════════════════
+   289→
+   290→function buildDependencyGraph(): DependencyNode[] {
+   291→  const nameMap = new Map(UNIFIED_VARIABLE_TABLE.map(v => [v.name, v]));
+   292→  const dependedBy = new Map<string, string[]>();
+   293→  for (const v of UNIFIED_VARIABLE_TABLE) {
+   294→    for (const dep of v.dependsOn) {
+   295→      const list = dependedBy.get(dep) ?? [];
+   296→      list.push(v.name);
+   297→      dependedBy.set(dep, list);
+   298→    }
+   299→  }
+   300→  return UNIFIED_VARIABLE_TABLE.map(v => ({
+   301→    symbol: v.symbol,
+   302→    type: v.type,
+   303→    engine: v.engine,
+   304→    path: v.path,
+   305→    dependsOn: v.dependsOn,
+   306→    dependedBy: dependedBy.get(v.name) ?? [],
+   307→  }));
+   308→}
+   309→
+   310→export const DEPENDENCY_GRAPH: DependencyNode[] = buildDependencyGraph();
+   311→
+   312→// ═══════════════════════════════════════════════════════════════════════
+   313→// دوال مساعدة
+   314→// ═══════════════════════════════════════════════════════════════════════
+   315→
+   316→export function getVariableByName(name: string): UnifiedVariable | undefined {
+   317→  return UNIFIED_VARIABLE_TABLE.find(v => v.name === name);
+   318→}
+   319→export function getVariablesByType(type: VariableType): UnifiedVariable[] {
+   320→  return UNIFIED_VARIABLE_TABLE.filter(v => v.type === type);
+   321→}
+   322→export function getVariablesByEngine(engine: EngineName): UnifiedVariable[] {
+   323→  return UNIFIED_VARIABLE_TABLE.filter(v => v.engine === engine);
+   324→}
+   325→export function getVariablesByPath(path: PathType): UnifiedVariable[] {
+   326→  return UNIFIED_VARIABLE_TABLE.filter(v => v.path === path);
+   327→}
+   328→export function getLockedForEngine(engine: EngineName): UnifiedVariable[] {
+   329→  return UNIFIED_VARIABLE_TABLE.filter(v => v.locked && v.engine === engine);
+   330→}
+   331→export function isLocked(name: string): boolean {
+   332→  return LOCKED_VARIABLE_NAMES.includes(name);
+   333→}
+   334→

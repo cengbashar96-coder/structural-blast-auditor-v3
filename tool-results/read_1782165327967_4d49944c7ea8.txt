@@ -1,0 +1,1176 @@
+     1→     1→// ═══════════════════════════════════════════════════════════════════════
+     2→     2→// صفحة تفاصيل الاختراق — محرك الاختراق الخطوة 3
+     3→     3→// منصة المدقق الديناميكي الموحد V3.0
+     4→     4→// تعرض نتائج حسابات الاختراق مع المقارنة المرجعية BMK-02
+     5→     5→// RTL Arabic | Dark Theme | Responsive
+     6→     6→// ═══════════════════════════════════════════════════════════════════════
+     7→     7→
+     8→     8→'use client';
+     9→     9→
+    10→    10→import React, { useMemo, useState, useCallback } from 'react';
+    11→    11→import { calculatePenetration } from '@/lib/engine/penetration-core';
+    12→    12→import { getWeaponById, getSoilByCode } from '@/lib/engine/constants';
+    13→    13→import {
+    14→    14→  STEP3_PENETRATION,
+    15→    15→  STEP2_INPUTS,
+    16→    16→  STEP2_LOOKUPS,
+    17→    17→  STEP2_GEOMETRY,
+    18→    18→} from '@/lib/constants/reference-data';
+    19→    19→import type { PenetrationInput, PenetrationOutput, SoilTypeCode } from '@/lib/engine/types';
+    20→    20→
+    21→    21→import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+    22→    22→import { Badge } from '@/components/ui/badge';
+    23→    23→import { Button } from '@/components/ui/button';
+    24→    24→import { Separator } from '@/components/ui/separator';
+    25→    25→import {
+    26→    26→  Table,
+    27→    27→  TableBody,
+    28→    28→  TableCell,
+    29→    29→  TableHead,
+    30→    30→  TableHeader,
+    31→    31→  TableRow,
+    32→    32→} from '@/components/ui/table';
+    33→    33→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+    34→    34→import {
+    35→    35→  Target,
+    36→    36→  Play,
+    37→    37→  CheckCircle2,
+    38→    38→  AlertTriangle,
+    39→    39→  Ruler,
+    40→    40→  Atom,
+    41→    41→  BookOpen,
+    42→    42→  ArrowDownFromLine,
+    43→    43→  Layers,
+    44→    44→  ShieldCheck,
+    45→    45→} from 'lucide-react';
+    46→    46→
+    47→    47→// ═══════════════════════════════════════════════════════════════════════
+    48→    48→// أنواع مساعدة
+    49→    49→// ═══════════════════════════════════════════════════════════════════════
+    50→    50→
+    51→    51→interface ExtendedPenetrationResult {
+    52→    52→  /** نتائج المحرك الأساسي */
+    53→    53→  engine: PenetrationOutput;
+    54→    54→  /** عمق الاختراق h_pr (m) */
+    55→    55→  hPr: number;
+    56→    56→  /** الشحنة الفعالة C_ef (kg) */
+    57→    57→  cEf: number;
+    58→    58→  /** البعد الفعلي R_actual (m) */
+    59→    59→  rActual: number;
+    60→    60→  /** البعد المختزل Zp */
+    61→    61→  zp: number;
+    62→    62→  /** العمق الصافي h_z (m) */
+    63→    63→  hz: number;
+    64→    64→  /** العمق المختزل h̄_z */
+    65→    65→  hzBar: number;
+    66→    66→  /** فرق العمق Y_diff (m) */
+    67→    67→  yDiff: number;
+    68→    68→  /** سماكة التدمير h_b(dest) (m) */
+    69→    69→  hbDest: number;
+    70→    70→  /** سماكة التشقق h_b(crack) (m) */
+    71→    71→  hbCrack: number;
+    72→    72→}
+    73→    73→
+    74→    74→interface DeviationEntry {
+    75→    75→  label: string;
+    76→    76→  symbol: string;
+    77→    77→  computed: number;
+    78→    78→  reference: number;
+    79→    79→  deviationPct: number;
+    80→    80→  unit: string;
+    81→    81→}
+    82→    82→
+    83→    83→// ═══════════════════════════════════════════════════════════════════════
+    84→    84→// حسابات الاختراق الموسعة
+    85→    85→// ═══════════════════════════════════════════════════════════════════════
+    86→    86→
+    87→    87→function computeExtendedResults(
+    88→    88→  engineOutput: PenetrationOutput,
+    89→    89→  ceilingDepth: number,
+    90→    90→  soilCode: SoilTypeCode
+    91→    91→): ExtendedPenetrationResult {
+    92→    92→  const hPr = engineOutput.penetrationDepth;
+    93→    93→  const cEf = engineOutput.cEffective;
+    94→    94→  const tsu = engineOutput.tsu;
+    95→    95→
+    96→    96→  // العمق الصافي
+    97→    97→  const hz = Math.max(hPr - tsu, 0);
+    98→    98→
+    99→    99→  // العمق المختزل
+   100→   100→  const cbrtCef = Math.cbrt(Math.max(cEf, 0.001));
+   101→   101→  const hzBar = cbrtCef > 0 ? hz / cbrtCef : 0;
+   102→   102→
+   103→   103→  // فرق العمق (المسافة من قاع الاختراق إلى سقف المنشأة)
+   104→   104→  const yDiff = ceilingDepth - hPr;
+   105→   105→
+   106→   106→  // البعد الفعلي R_actual — المسافة من مركز الانفجار إلى المنشأة
+   107→   107→  // R_actual = sqrt(Z² + h_pr²) + offset بحسب الهندسة
+   108→   108→  const rActual = Math.sqrt(
+   109→   109→    Math.pow(ceilingDepth, 2) +
+   110→   110→    Math.pow(hPr, 2) +
+   111→   111→    Math.pow(STEP2_GEOMETRY.a_et + STEP2_GEOMETRY.ap / 2, 2) * 0.3
+   112→   112→  );
+   113→   113→
+   114→   114→  // البعد المختزل Zp = R_actual / ∛C_ef
+   115→   115→  const zp = cbrtCef > 0 ? rActual / cbrtCef : 0;
+   116→   116→
+   117→   117→  // سماكة التدمير والتشقق — من معاملات التربة
+   118→   118→  let hbDest = hPr * 1.1;
+   119→   119→  let hbCrack = hPr * 1.3;
+   120→   120→  try {
+   121→   121→    const soilData = getSoilByCode(soilCode);
+   122→   122→    if (soilData?.destructionCoeff) hbDest = hPr * (1 + soilData.destructionCoeff);
+   123→   123→    if (soilData?.crackingCoeff) hbCrack = hPr * (1 + soilData.crackingCoeff);
+   124→   124→  } catch {
+   125→   125→    // استخدام القيم الافتراضية
+   126→   126→  }
+   127→   127→
+   128→   128→  return {
+   129→   129→    engine: engineOutput,
+   130→   130→    hPr,
+   131→   131→    cEf,
+   132→   132→    rActual,
+   133→   133→    zp,
+   134→   134→    hz,
+   135→   135→    hzBar,
+   136→   136→    yDiff,
+   137→   137→    hbDest,
+   138→   138→    hbCrack,
+   139→   139→  };
+   140→   140→}
+   141→   141→
+   142→   142→// ═══════════════════════════════════════════════════════════════════════
+   143→   143→// دوال مساعدة للعرض
+   144→   144→// ═══════════════════════════════════════════════════════════════════════
+   145→   145→
+   146→   146→function fmt(value: number, decimals: number = 4): string {
+   147→   147→  if (!isFinite(value)) return '—';
+   148→   148→  return value.toFixed(decimals);
+   149→   149→}
+   150→   150→
+   151→   151→function getDeviationColor(pct: number): string {
+   152→   152→  const abs = Math.abs(pct);
+   153→   153→  if (abs < 1) return 'text-emerald-400';
+   154→   154→  if (abs < 5) return 'text-amber-400';
+   155→   155→  return 'text-red-400';
+   156→   156→}
+   157→   157→
+   158→   158→function getDeviationBg(pct: number): string {
+   159→   159→  const abs = Math.abs(pct);
+   160→   160→  if (abs < 1) return 'bg-emerald-500/10 border-emerald-500/20';
+   161→   161→  if (abs < 5) return 'bg-amber-500/10 border-amber-500/20';
+   162→   162→  return 'bg-red-500/10 border-red-500/20';
+   163→   163→}
+   164→   164→
+   165→   165→function getDeviationBadgeVariant(pct: number): 'default' | 'secondary' | 'destructive' {
+   166→   166→  const abs = Math.abs(pct);
+   167→   167→  if (abs < 1) return 'default';
+   168→   168→  if (abs < 5) return 'secondary';
+   169→   169→  return 'destructive';
+   170→   170→}
+   171→   171→
+   172→   172→// ═══════════════════════════════════════════════════════════════════════
+   173→   173→// بيانات جدول المعاملات
+   174→   174→// ═══════════════════════════════════════════════════════════════════════
+   175→   175→
+   176→   176→interface CoefficientRow {
+   177→   177→  nameAr: string;
+   178→   178→  symbol: string;
+   179→   179→  value: number;
+   180→   180→  unit: string;
+   181→   181→  formula?: string;
+   182→   182→}
+   183→   183→
+   184→   184→function buildCoefficientsTable(ref: typeof STEP3_PENETRATION): CoefficientRow[] {
+   185→   185→  return [
+   186→   186→    { nameAr: 'معامل شكل الرأس', symbol: 'λ₁', value: ref.lambda1, unit: '-', formula: '0.5 + 0.4×(Lh/D)^0.666' },
+   187→   187→    { nameAr: 'معامل تأثير القطر', symbol: 'λ₂', value: ref.lambda2, unit: '-', formula: '2.8×d^0.333 - 1.3×d^0.5' },
+   188→   188→    { nameAr: 'أُس التأثير', symbol: 'n', value: ref.n_exp, unit: '-', formula: '3.5 - Lh/D' },
+   189→   189→    { nameAr: 'معامل زاوية الاختراق', symbol: 'τ', value: ref.tsu, unit: 'm', formula: '0.5×lₖ×cos((α+nα)/2)' },
+   190→   190→    { nameAr: 'العمق الصافي', symbol: 'h_z', value: ref.h_z, unit: 'm', formula: 'h_pr - τ' },
+   191→   191→    { nameAr: 'العمق المختزل', symbol: 'h̄_z', value: ref.h_z_bar, unit: '-', formula: 'h_z / ∛C_ef' },
+   192→   192→    { nameAr: 'فرق العمق', symbol: 'Y_diff', value: ref.Y_diff, unit: 'm', formula: 'Z - h_pr' },
+   193→   193→    { nameAr: 'سماكة التدمير', symbol: 'h_b(dest)', value: ref.hb_destruction, unit: 'm' },
+   194→   194→    { nameAr: 'سماكة التشقق', symbol: 'h_b(crack)', value: ref.hb_cracking, unit: 'm' },
+   195→   195→  ];
+   196→   196→}
+   197→   197→
+   198→   198→// ═══════════════════════════════════════════════════════════════════════
+   199→   199→// بيانات الصفحة الرئيسية
+   200→   200→// ═══════════════════════════════════════════════════════════════════════
+   201→   201→
+   202→   202→export default function PenetrationDetailPage() {
+   203→   203→  const [engineResults, setEngineResults] = useState<ExtendedPenetrationResult | null>(null);
+   204→   204→  const [isRunning, setIsRunning] = useState(false);
+   205→   205→  const [engineError, setEngineError] = useState<string | null>(null);
+   206→   206→
+   207→   207→  // ─── بيانات المرجع BMK-02 ───
+   208→   208→  const weapon = useMemo(() => {
+   209→   209→    try {
+   210→   210→      return getWeaponById('W_MK83');
+   211→   211→    } catch {
+   212→   212→      return null;
+   213→   213→    }
+   214→   214→  }, []);
+   215→   215→
+   216→   216→  const soil = useMemo(() => {
+   217→   217→    try {
+   218→   218→      return getSoilByCode('MEDIUM_SOIL');
+   219→   219→    } catch {
+   220→   220→      return null;
+   221→   221→    }
+   222→   222→  }, []);
+   223→   223→
+   224→   224→  const refCoefficients = useMemo(() => buildCoefficientsTable(STEP3_PENETRATION), []);
+   225→   225→
+   226→   226→  // ─── تشغيل المحرك ───
+   227→   227→  const handleRunEngine = useCallback(async () => {
+   228→   228→    setIsRunning(true);
+   229→   229→    setEngineError(null);
+   230→   230→
+   231→   231→    try {
+   232→   232→      // تأخير بسيط لتأثير بصري
+   233→   233→      await new Promise((r) => setTimeout(r, 400));
+   234→   234→
+   235→   235→      const input: PenetrationInput = {
+   236→   236→        weaponId: 'W_MK83',
+   237→   237→        impactVelocity: STEP2_INPUTS.V,
+   238→   238→        soilTypeCode: 'MEDIUM_SOIL',
+   239→   239→        impactAngleDeg: STEP2_INPUTS.alpha,
+   240→   240→      };
+   241→   241→
+   242→   242→      const engineOutput = calculatePenetration(input);
+   243→   243→      const extended = computeExtendedResults(
+   244→   244→        engineOutput,
+   245→   245→        STEP2_INPUTS.Z,
+   246→   246→        'MEDIUM_SOIL'
+   247→   247→      );
+   248→   248→
+   249→   249→      setEngineResults(extended);
+   250→   250→    } catch (err) {
+   251→   251→      setEngineError(
+   252→   252→        err instanceof Error ? err.message : 'خطأ غير معروف في محرك الاختراق'
+   253→   253→      );
+   254→   254→    } finally {
+   255→   255→      setIsRunning(false);
+   256→   256→    }
+   257→   257→  }, []);
+   258→   258→
+   259→   259→  // ─── حساب الانحرافات ───
+   260→   260→  const deviations = useMemo<DeviationEntry[]>(() => {
+   261→   261→    if (!engineResults) return [];
+   262→   262→
+   263→   263→    const entries: DeviationEntry[] = [
+   264→   264→      {
+   265→   265→        label: 'معامل شكل الرأس',
+   266→   266→        symbol: 'λ₁',
+   267→   267→        computed: engineResults.engine.lambda1,
+   268→   268→        reference: STEP3_PENETRATION.lambda1,
+   269→   269→        deviationPct:
+   270→   270→          (Math.abs(engineResults.engine.lambda1 - STEP3_PENETRATION.lambda1) /
+   271→   271→            Math.abs(STEP3_PENETRATION.lambda1)) *
+   272→   272→          100,
+   273→   273→        unit: '-',
+   274→   274→      },
+   275→   275→      {
+   276→   276→        label: 'معامل تأثير القطر',
+   277→   277→        symbol: 'λ₂',
+   278→   278→        computed: engineResults.engine.lambda2,
+   279→   279→        reference: STEP3_PENETRATION.lambda2,
+   280→   280→        deviationPct:
+   281→   281→          (Math.abs(engineResults.engine.lambda2 - STEP3_PENETRATION.lambda2) /
+   282→   282→            Math.abs(STEP3_PENETRATION.lambda2)) *
+   283→   283→          100,
+   284→   284→        unit: '-',
+   285→   285→      },
+   286→   286→      {
+   287→   287→        label: 'أُس التأثير',
+   288→   288→        symbol: 'n',
+   289→   289→        computed: engineResults.engine.nExp,
+   290→   290→        reference: STEP3_PENETRATION.n_exp,
+   291→   291→        deviationPct:
+   292→   292→          (Math.abs(engineResults.engine.nExp - STEP3_PENETRATION.n_exp) /
+   293→   293→            Math.abs(STEP3_PENETRATION.n_exp)) *
+   294→   294→          100,
+   295→   295→        unit: '-',
+   296→   296→      },
+   297→   297→      {
+   298→   298→        label: 'الشحنة الفعالة',
+   299→   299→        symbol: 'C_ef',
+   300→   300→        computed: engineResults.cEf,
+   301→   301→        reference: STEP3_PENETRATION.C_ef,
+   302→   302→        deviationPct:
+   303→   303→          (Math.abs(engineResults.cEf - STEP3_PENETRATION.C_ef) /
+   304→   304→            Math.abs(STEP3_PENETRATION.C_ef)) *
+   305→   305→          100,
+   306→   306→        unit: 'kg',
+   307→   307→      },
+   308→   308→      {
+   309→   309→        label: 'معامل زاوية الاختراق',
+   310→   310→        symbol: 'τ',
+   311→   311→        computed: engineResults.engine.tsu,
+   312→   312→        reference: STEP3_PENETRATION.tsu,
+   313→   313→        deviationPct:
+   314→   314→          (Math.abs(engineResults.engine.tsu - STEP3_PENETRATION.tsu) /
+   315→   315→            Math.abs(STEP3_PENETRATION.tsu)) *
+   316→   316→          100,
+   317→   317→        unit: 'm',
+   318→   318→      },
+   319→   319→      {
+   320→   320→        label: 'عمق الاختراق',
+   321→   321→        symbol: 'h_pr',
+   322→   322→        computed: engineResults.hPr,
+   323→   323→        reference: STEP3_PENETRATION.h_pr,
+   324→   324→        deviationPct:
+   325→   325→          (Math.abs(engineResults.hPr - STEP3_PENETRATION.h_pr) /
+   326→   326→            Math.abs(STEP3_PENETRATION.h_pr)) *
+   327→   327→          100,
+   328→   328→        unit: 'm',
+   329→   329→      },
+   330→   330→      {
+   331→   331→        label: 'العمق الصافي',
+   332→   332→        symbol: 'h_z',
+   333→   333→        computed: engineResults.hz,
+   334→   334→        reference: STEP3_PENETRATION.h_z,
+   335→   335→        deviationPct:
+   336→   336→          (Math.abs(engineResults.hz - STEP3_PENETRATION.h_z) /
+   337→   337→            Math.abs(STEP3_PENETRATION.h_z)) *
+   338→   338→          100,
+   339→   339→        unit: 'm',
+   340→   340→      },
+   341→   341→      {
+   342→   342→        label: 'العمق المختزل',
+   343→   343→        symbol: 'h̄_z',
+   344→   344→        computed: engineResults.hzBar,
+   345→   345→        reference: STEP3_PENETRATION.h_z_bar,
+   346→   346→        deviationPct:
+   347→   347→          (Math.abs(engineResults.hzBar - STEP3_PENETRATION.h_z_bar) /
+   348→   348→            Math.abs(STEP3_PENETRATION.h_z_bar)) *
+   349→   349→          100,
+   350→   350→        unit: '-',
+   351→   351→      },
+   352→   352→      {
+   353→   353→        label: 'البعد الفعلي',
+   354→   354→        symbol: 'R_actual',
+   355→   355→        computed: engineResults.rActual,
+   356→   356→        reference: STEP3_PENETRATION.R_actual,
+   357→   357→        deviationPct:
+   358→   358→          (Math.abs(engineResults.rActual - STEP3_PENETRATION.R_actual) /
+   359→   359→            Math.abs(STEP3_PENETRATION.R_actual)) *
+   360→   360→          100,
+   361→   361→        unit: 'm',
+   362→   362→      },
+   363→   363→      {
+   364→   364→        label: 'البعد المختزل',
+   365→   365→        symbol: 'Zp',
+   366→   366→        computed: engineResults.zp,
+   367→   367→        reference: STEP3_PENETRATION.Zp,
+   368→   368→        deviationPct:
+   369→   369→          (Math.abs(engineResults.zp - STEP3_PENETRATION.Zp) /
+   370→   370→            Math.abs(STEP3_PENETRATION.Zp)) *
+   371→   371→          100,
+   372→   372→        unit: '-',
+   373→   373→      },
+   374→   374→      {
+   375→   375→        label: 'فرق العمق',
+   376→   376→        symbol: 'Y_diff',
+   377→   377→        computed: engineResults.yDiff,
+   378→   378→        reference: STEP3_PENETRATION.Y_diff,
+   379→   379→        deviationPct:
+   380→   380→          (Math.abs(engineResults.yDiff - STEP3_PENETRATION.Y_diff) /
+   381→   381→            Math.abs(STEP3_PENETRATION.Y_diff)) *
+   382→   382→          100,
+   383→   383→        unit: 'm',
+   384→   384→      },
+   385→   385→      {
+   386→   386→        label: 'سماكة التدمير',
+   387→   387→        symbol: 'h_b(dest)',
+   388→   388→        computed: engineResults.hbDest,
+   389→   389→        reference: STEP3_PENETRATION.hb_destruction,
+   390→   390→        deviationPct:
+   391→   391→          (Math.abs(engineResults.hbDest - STEP3_PENETRATION.hb_destruction) /
+   392→   392→            Math.abs(STEP3_PENETRATION.hb_destruction)) *
+   393→   393→          100,
+   394→   394→        unit: 'm',
+   395→   395→      },
+   396→   396→      {
+   397→   397→        label: 'سماكة التشقق',
+   398→   398→        symbol: 'h_b(crack)',
+   399→   399→        computed: engineResults.hbCrack,
+   400→   400→        reference: STEP3_PENETRATION.hb_cracking,
+   401→   401→        deviationPct:
+   402→   402→          (Math.abs(engineResults.hbCrack - STEP3_PENETRATION.hb_cracking) /
+   403→   403→            Math.abs(STEP3_PENETRATION.hb_cracking)) *
+   404→   404→          100,
+   405→   405→        unit: 'm',
+   406→   406→      },
+   407→   407→    ];
+   408→   408→
+   409→   409→    return entries;
+   410→   410→  }, [engineResults]);
+   411→   411→
+   412→   412→  // ─── ملخص الانحرافات ───
+   413→   413→  const deviationSummary = useMemo(() => {
+   414→   414→    if (deviations.length === 0) return null;
+   415→   415→    const maxDev = Math.max(...deviations.map((d) => d.deviationPct));
+   416→   416→    const avgDev =
+   417→   417→      deviations.reduce((sum, d) => sum + d.deviationPct, 0) / deviations.length;
+   418→   418→    const passing = deviations.filter((d) => d.deviationPct < 5).length;
+   419→   419→    return { maxDev, avgDev, passing, total: deviations.length };
+   420→   420→  }, [deviations]);
+   421→   421→
+   422→   422→  // ─── القيم المرجعية الرئيسية ───
+   423→   423→  const mainResults = [
+   424→   424→    {
+   425→   425→      label: 'عمق الاختراق',
+   426→   426→      symbol: 'h_pr',
+   427→   427→      value: STEP3_PENETRATION.h_pr,
+   428→   428→      unit: 'm',
+   429→   429→      description: 'القيمة الأساسية — عمق اختراق السلاح في التربة',
+   430→   430→      isKey: true,
+   431→   431→      icon: ArrowDownFromLine,
+   432→   432→    },
+   433→   433→    {
+   434→   434→      label: 'الشحنة الفعالة',
+   435→   435→      symbol: 'C_ef',
+   436→   436→      value: STEP3_PENETRATION.C_ef,
+   437→   437→      unit: 'kg',
+   438→   438→      description: 'وزن الشحنة المتفجرة الفعالة بعد المعاملة',
+   439→   439→      isKey: false,
+   440→   440→      icon: Atom,
+   441→   441→    },
+   442→   442→    {
+   443→   443→      label: 'البعد الفعلي',
+   444→   444→      symbol: 'R_actual',
+   445→   445→      value: STEP3_PENETRATION.R_actual,
+   446→   446→      unit: 'm',
+   447→   447→      description: 'البعد الشعاعي الفعلي من مركز الانفجار',
+   448→   448→      isKey: false,
+   449→   449→      icon: Ruler,
+   450→   450→    },
+   451→   451→    {
+   452→   452→      label: 'البعد المختزل',
+   453→   453→      symbol: 'Zp',
+   454→   454→      value: STEP3_PENETRATION.Zp,
+   455→   455→      unit: '—',
+   456→   456→      description: 'البعد المختزل للضغط العصفي',
+   457→   457→      isKey: false,
+   458→   458→      icon: Layers,
+   459→   459→    },
+   460→   460→  ];
+   461→   461→
+   462→   462→  return (
+   463→   463→    <div
+   464→   464→      className="space-y-6"
+   465→   465→      dir="rtl"
+   466→   466→      role="region"
+   467→   467→      aria-labelledby="penetration-main-heading"
+   468→   468→    >
+   469→   469→      {/* ═══════════════════════════════════════════════════════════════ */}
+   470→   470→      {/* الرأس الرئيسي                                                 */}
+   471→   471→      {/* ═══════════════════════════════════════════════════════════════ */}
+   472→   472→      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-800/60 pb-4 gap-4">
+   473→   473→        <div>
+   474→   474→          <h1
+   475→   475→            id="penetration-main-heading"
+   476→   476→            className="text-xl font-bold text-slate-100 flex items-center gap-2"
+   477→   477→          >
+   478→   478→            <Target className="size-5 text-emerald-400" />
+   479→   479→            محرك الاختراق — الخطوة 3
+   480→   480→          </h1>
+   481→   481→          <p className="text-xs text-slate-400 mt-1">
+   482→   482→            حسابات الاختراق والشحنة الفعالة — المرجع الذهبي BMK-02 (MK83 + MEDIUM_SOIL)
+   483→   483→          </p>
+   484→   484→        </div>
+   485→   485→        <div className="flex items-center gap-3">
+   486→   486→          <Badge
+   487→   487→            variant="outline"
+   488→   488→            className="border-emerald-500/30 text-emerald-400 font-mono text-[10px] px-2 py-0.5"
+   489→   489→          >
+   490→   490→            BMK-02 LOCKED
+   491→   491→          </Badge>
+   492→   492→          <Button
+   493→   493→            onClick={handleRunEngine}
+   494→   494→            disabled={isRunning}
+   495→   495→            size="sm"
+   496→   496→            className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
+   497→   497→          >
+   498→   498→            <Play className="size-3.5" />
+   499→   499→            {isRunning ? 'جاري الحساب...' : 'تشغيل المحرك'}
+   500→   500→          </Button>
+   501→   501→        </div>
+   502→   502→      </div>
+   503→   503→
+   504→   504→      {/* ═══════════════════════════════════════════════════════════════ */}
+   505→   505→      {/* بطاقة ملخص المدخلات                                           */}
+   506→   506→      {/* ═══════════════════════════════════════════════════════════════ */}
+   507→   507→      <Card className="bg-slate-900 border-slate-800">
+   508→   508→        <CardHeader className="pb-3">
+   509→   509→          <CardTitle className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+   510→   510→            <BookOpen className="size-4 text-slate-400" />
+   511→   511→            ملخص المدخلات — BMK-02
+   512→   512→          </CardTitle>
+   513→   513→          <CardDescription className="text-xs text-slate-500">
+   514→   514→            المعطيات المرجعية المقفلة لحالة الاختبار الذهبية
+   515→   515→          </CardDescription>
+   516→   516→        </CardHeader>
+   517→   517→        <CardContent>
+   518→   518→          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+   519→   519→            {[
+   520→   520→              { label: 'السلاح', value: weapon?.nameAr ?? 'MK83', sub: weapon?.name ?? 'MK83' },
+   521→   521→              { label: 'نوع التربة', value: soil?.nameAr ?? 'طين مع حجارة', sub: soil?.referenceName ?? 'clay_with_stones' },
+   522→   522→              { label: 'سرعة الاصطدام', value: `${STEP2_INPUTS.V} m/s`, sub: `V = ${STEP2_INPUTS.V}` },
+   523→   523→              { label: 'زاوية الاصطدام', value: `${STEP2_INPUTS.alpha}°`, sub: `α = ${STEP2_INPUTS.alpha}` },
+   524→   524→              { label: 'عمق السقف', value: `${STEP2_INPUTS.Z} m`, sub: `Z = ${STEP2_INPUTS.Z}` },
+   525→   525→              { label: 'وزن الشحنة', value: `${STEP2_INPUTS.C} kg`, sub: `C = ${STEP2_INPUTS.C}` },
+   526→   526→            ].map((item, idx) => (
+   527→   527→              <div
+   528→   528→                key={idx}
+   529→   529→                className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/40"
+   530→   530→              >
+   531→   531→                <div className="text-[10px] text-slate-500 mb-1">{item.label}</div>
+   532→   532→                <div className="text-sm font-semibold text-slate-200 truncate">
+   533→   533→                  {item.value}
+   534→   534→                </div>
+   535→   535→                <div className="text-[10px] text-slate-600 font-mono mt-0.5">
+   536→   536→                  {item.sub}
+   537→   537→                </div>
+   538→   538→              </div>
+   539→   539→            ))}
+   540→   540→          </div>
+   541→   541→
+   542→   542→          {/* معاملات البحث الإضافية */}
+   543→   543→          <Separator className="bg-slate-700/40 my-3" />
+   544→   544→          <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+   545→   545→            {[
+   546→   546→              { label: 'K₁', value: STEP2_LOOKUPS.K1 },
+   547→   547→              { label: 'Kpr_g', value: STEP2_LOOKUPS.kpr_g },
+   548→   548→              { label: 'Kpr_b', value: STEP2_LOOKUPS.kpr_b },
+   549→   549→              { label: 'm₁', value: STEP2_LOOKUPS.m1 },
+   550→   550→              { label: 'RbH', value: STEP2_LOOKUPS.RbH },
+   551→   551→              { label: 'RsH', value: STEP2_LOOKUPS.RsH },
+   552→   552→              { label: 'R̄', value: STEP2_LOOKUPS.R_bar },
+   553→   553→            ].map((item, idx) => (
+   554→   554→              <div key={idx} className="text-center">
+   555→   555→                <div className="text-[10px] text-slate-500 font-mono">{item.label}</div>
+   556→   556→                <div className="text-xs text-slate-300 font-mono">
+   557→   557→                  {typeof item.value === 'number' && item.value < 0.001
+   558→   558→                    ? item.value.toExponential(1)
+   559→   559→                    : item.value}
+   560→   560→                </div>
+   561→   561→              </div>
+   562→   562→            ))}
+   563→   563→          </div>
+   564→   564→        </CardContent>
+   565→   565→      </Card>
+   566→   566→
+   567→   567→      {/* ═══════════════════════════════════════════════════════════════ */}
+   568→   568→      {/* النتائج الرئيسية — بطاقات كبيرة                                */}
+   569→   569→      {/* ═══════════════════════════════════════════════════════════════ */}
+   570→   570→      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+   571→   571→        {mainResults.map((result) => {
+   572→   572→          const IconComp = result.icon;
+   573→   573→          return (
+   574→   574→            <Card
+   575→   575→              key={result.symbol}
+   576→   576→              className={`bg-slate-900 border-slate-800 relative overflow-hidden ${
+   577→   577→                result.isKey ? 'ring-1 ring-emerald-500/30' : ''
+   578→   578→              }`}
+   579→   579→            >
+   580→   580→              {result.isKey && (
+   581→   581→                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-l from-emerald-500 to-emerald-400" />
+   582→   582→              )}
+   583→   583→              <CardContent className="p-4">
+   584→   584→                <div className="flex items-center justify-between mb-2">
+   585→   585→                  <div className="flex items-center gap-1.5">
+   586→   586→                    <IconComp
+   587→   587→                      className={`size-4 ${
+   588→   588→                        result.isKey ? 'text-emerald-400' : 'text-slate-400'
+   589→   589→                      }`}
+   590→   590→                    />
+   591→   591→                    <span className="text-xs text-slate-400">{result.label}</span>
+   592→   592→                  </div>
+   593→   593→                  <Badge
+   594→   594→                    variant="outline"
+   595→   595→                    className={`font-mono text-[10px] px-1.5 py-0 ${
+   596→   596→                      result.isKey
+   597→   597→                        ? 'border-emerald-500/30 text-emerald-400'
+   598→   598→                        : 'border-slate-700 text-slate-500'
+   599→   599→                    }`}
+   600→   600→                  >
+   601→   601→                    {result.symbol}
+   602→   602→                  </Badge>
+   603→   603→                </div>
+   604→   604→                <div
+   605→   605→                  className={`text-2xl font-bold font-mono tracking-tight ${
+   606→   606→                    result.isKey ? 'text-emerald-400' : 'text-emerald-300/80'
+   607→   607→                  }`}
+   608→   608→                >
+   609→   609→                  {fmt(result.value, 4)}
+   610→   610→                </div>
+   611→   611→                <div className="flex items-center justify-between mt-1">
+   612→   612→                  <span className="text-[10px] text-slate-600">{result.unit}</span>
+   613→   613→                  {result.isKey && (
+   614→   614→                    <span className="text-[10px] text-emerald-500/60 font-medium">
+   615→   615→                      القيمة المفتاحية
+   616→   616→                    </span>
+   617→   617→                  )}
+   618→   618→                </div>
+   619→   619→                <p className="text-[10px] text-slate-600 mt-2 leading-relaxed">
+   620→   620→                  {result.description}
+   621→   621→                </p>
+   622→   622→              </CardContent>
+   623→   623→            </Card>
+   624→   624→          );
+   625→   625→        })}
+   626→   626→      </div>
+   627→   627→
+   628→   628→      {/* ═══════════════════════════════════════════════════════════════ */}
+   629→   629→      {/* التبويبات: جدول المعاملات | المقارنة المرجعية | المعادلات      */}
+   630→   630→      {/* ═══════════════════════════════════════════════════════════════ */}
+   631→   631→      <Tabs defaultValue="coefficients" dir="rtl" className="space-y-4">
+   632→   632→        <TabsList className="bg-slate-800/50 border border-slate-700/40">
+   633→   633→          <TabsTrigger
+   634→   634→            value="coefficients"
+   635→   635→            className="data-[state=active]:bg-emerald-600/20 data-[state=active]:text-emerald-400 text-slate-400 text-xs"
+   636→   636→          >
+   637→   637→            جدول المعاملات
+   638→   638→          </TabsTrigger>
+   639→   639→          <TabsTrigger
+   640→   640→            value="comparison"
+   641→   641→            className="data-[state=active]:bg-emerald-600/20 data-[state=active]:text-emerald-400 text-slate-400 text-xs"
+   642→   642→          >
+   643→   643→            مقارنة BMK-02
+   644→   644→          </TabsTrigger>
+   645→   645→          <TabsTrigger
+   646→   646→            value="formulas"
+   647→   647→            className="data-[state=active]:bg-emerald-600/20 data-[state=active]:text-emerald-400 text-slate-400 text-xs"
+   648→   648→          >
+   649→   649→            المعادلات المرجعية
+   650→   650→          </TabsTrigger>
+   651→   651→        </TabsList>
+   652→   652→
+   653→   653→        {/* ─── جدول المعاملات ─── */}
+   654→   654→        <TabsContent value="coefficients" className="mt-4">
+   655→   655→          <Card className="bg-slate-900 border-slate-800">
+   656→   656→            <CardHeader className="pb-3">
+   657→   657→              <CardTitle className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+   658→   658→                <Layers className="size-4 text-slate-400" />
+   659→   659→                معاملات الاختراق — الخطوة 3
+   660→   660→              </CardTitle>
+   661→   661→              <CardDescription className="text-xs text-slate-500">
+   662→   662→                جميع المعاملات الوسيطة والمشتقة لحساب عمق الاختراق
+   663→   663→              </CardDescription>
+   664→   664→            </CardHeader>
+   665→   665→            <CardContent className="p-0">
+   666→   666→              <div className="overflow-x-auto">
+   667→   667→                <Table>
+   668→   668→                  <TableHeader>
+   669→   669→                    <TableRow className="border-b border-slate-700/40 hover:bg-transparent">
+   670→   670→                      <TableHead className="text-slate-400 text-xs font-semibold">
+   671→   671→                        المعامل
+   672→   672→                      </TableHead>
+   673→   673→                      <TableHead className="text-slate-400 text-xs font-semibold text-center">
+   674→   674→                        الرمز
+   675→   675→                      </TableHead>
+   676→   676→                      <TableHead className="text-slate-400 text-xs font-semibold text-left font-mono">
+   677→   677→                        القيمة
+   678→   678→                      </TableHead>
+   679→   679→                      <TableHead className="text-slate-400 text-xs font-semibold text-center">
+   680→   680→                        الوحدة
+   681→   681→                      </TableHead>
+   682→   682→                      <TableHead className="text-slate-400 text-xs font-semibold">
+   683→   683→                        المعادلة
+   684→   684→                      </TableHead>
+   685→   685→                    </TableRow>
+   686→   686→                  </TableHeader>
+   687→   687→                  <TableBody>
+   688→   688→                    {refCoefficients.map((row, idx) => (
+   689→   689→                      <TableRow
+   690→   690→                        key={row.symbol}
+   691→   691→                        className={`border-b border-slate-800/60 ${
+   692→   692→                          idx % 2 === 0 ? 'bg-slate-800/20' : ''
+   693→   693→                        } hover:bg-slate-800/40`}
+   694→   694→                      >
+   695→   695→                        <TableCell className="text-xs text-slate-300 font-medium py-2.5">
+   696→   696→                          {row.nameAr}
+   697→   697→                        </TableCell>
+   698→   698→                        <TableCell className="text-xs text-center py-2.5">
+   699→   699→                          <Badge
+   700→   700→                            variant="outline"
+   701→   701→                            className="border-slate-600/50 text-emerald-400 font-mono text-[11px] px-1.5 py-0"
+   702→   702→                          >
+   703→   703→                            {row.symbol}
+   704→   704→                          </Badge>
+   705→   705→                        </TableCell>
+   706→   706→                        <TableCell className="text-xs text-left font-mono text-slate-200 py-2.5">
+   707→   707→                          {fmt(row.value, 6)}
+   708→   708→                        </TableCell>
+   709→   709→                        <TableCell className="text-xs text-center text-slate-500 py-2.5">
+   710→   710→                          {row.unit}
+   711→   711→                        </TableCell>
+   712→   712→                        <TableCell className="text-[10px] text-slate-500 font-mono py-2.5">
+   713→   713→                          {row.formula ?? '—'}
+   714→   714→                        </TableCell>
+   715→   715→                      </TableRow>
+   716→   716→                    ))}
+   717→   717→                  </TableBody>
+   718→   718→                </Table>
+   719→   719→              </div>
+   720→   720→            </CardContent>
+   721→   721→          </Card>
+   722→   722→        </TabsContent>
+   723→   723→
+   724→   724→        {/* ─── مقارنة BMK-02 المرجعية ─── */}
+   725→   725→        <TabsContent value="comparison" className="mt-4">
+   726→   726→          <Card className="bg-slate-900 border-slate-800">
+   727→   727→            <CardHeader className="pb-3">
+   728→   728→              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+   729→   729→                <div>
+   730→   730→                  <CardTitle className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+   731→   731→                    <ShieldCheck className="size-4 text-slate-400" />
+   732→   732→                    مقارنة BMK-02 المرجعية
+   733→   733→                  </CardTitle>
+   734→   734→                  <CardDescription className="text-xs text-slate-500 mt-0.5">
+   735→   735→                    مقارنة القيم المحسوبة بالمحرك مقابل المرجع الذهبي المقفل
+   736→   736→                  </CardDescription>
+   737→   737→                </div>
+   738→   738→                {deviationSummary && (
+   739→   739→                  <div className="flex items-center gap-2">
+   740→   740→                    <Badge
+   741→   741→                      variant={deviationSummary.maxDev < 5 ? 'default' : 'destructive'}
+   742→   742→                      className="font-mono text-[10px]"
+   743→   743→                    >
+   744→   744→                      أقصى انحراف: {fmt(deviationSummary.maxDev, 2)}%
+   745→   745→                    </Badge>
+   746→   746→                    <Badge variant="outline" className="border-slate-700 text-slate-400 font-mono text-[10px]">
+   747→   747→                      {deviationSummary.passing}/{deviationSummary.total} ضمن التسامح
+   748→   748→                    </Badge>
+   749→   749→                  </div>
+   750→   750→                )}
+   751→   751→              </div>
+   752→   752→            </CardHeader>
+   753→   753→            <CardContent>
+   754→   754→              {!engineResults ? (
+   755→   755→                <div className="flex flex-col items-center justify-center py-12 text-center">
+   756→   756→                  <div className="size-16 rounded-full bg-slate-800/50 border border-slate-700/40 flex items-center justify-center mb-4">
+   757→   757→                    <Play className="size-6 text-slate-500" />
+   758→   758→                  </div>
+   759→   759→                  <p className="text-sm text-slate-400 mb-1">
+   760→   760→                    لم يتم تشغيل المحرك بعد
+   761→   761→                  </p>
+   762→   762→                  <p className="text-xs text-slate-600 mb-4">
+   763→   763→                    اضغط &quot;تشغيل المحرك&quot; لمقارنة النتائج المحسوبة مع المرجع BMK-02
+   764→   764→                  </p>
+   765→   765→                  <Button
+   766→   766→                    onClick={handleRunEngine}
+   767→   767→                    disabled={isRunning}
+   768→   768→                    size="sm"
+   769→   769→                    variant="outline"
+   770→   770→                    className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 gap-1.5"
+   771→   771→                  >
+   772→   772→                    <Play className="size-3.5" />
+   773→   773→                    تشغيل المحرك الآن
+   774→   774→                  </Button>
+   775→   775→                </div>
+   776→   776→              ) : engineError ? (
+   777→   777→                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
+   778→   778→                  <div className="flex items-center gap-2 text-red-400 mb-2">
+   779→   779→                    <AlertTriangle className="size-4" />
+   780→   780→                    <span className="text-sm font-medium">خطأ في المحرك</span>
+   781→   781→                  </div>
+   782→   782→                  <p className="text-xs text-red-300/80 font-mono">{engineError}</p>
+   783→   783→                </div>
+   784→   784→              ) : (
+   785→   785→                <div className="space-y-4">
+   786→   786→                  {/* شريط ملخص الانحرافات */}
+   787→   787→                  {deviationSummary && (
+   788→   788→                    <div
+   789→   789→                      className={`rounded-lg border p-3 ${getDeviationBg(
+   790→   790→                        deviationSummary.maxDev
+   791→   791→                      )}`}
+   792→   792→                    >
+   793→   793→                      <div className="grid grid-cols-3 gap-4 text-center">
+   794→   794→                        <div>
+   795→   795→                          <div className="text-[10px] text-slate-500 mb-0.5">
+   796→   796→                            أقصى انحراف
+   797→   797→                          </div>
+   798→   798→                          <div
+   799→   799→                            className={`text-lg font-bold font-mono ${getDeviationColor(
+   800→   800→                              deviationSummary.maxDev
+   801→   801→                            )}`}
+   802→   802→                          >
+   803→   803→                            {fmt(deviationSummary.maxDev, 2)}%
+   804→   804→                          </div>
+   805→   805→                        </div>
+   806→   806→                        <div>
+   807→   807→                          <div className="text-[10px] text-slate-500 mb-0.5">
+   808→   808→                            متوسط الانحراف
+   809→   809→                          </div>
+   810→   810→                          <div
+   811→   811→                            className={`text-lg font-bold font-mono ${getDeviationColor(
+   812→   812→                              deviationSummary.avgDev
+   813→   813→                            )}`}
+   814→   814→                          >
+   815→   815→                            {fmt(deviationSummary.avgDev, 2)}%
+   816→   816→                          </div>
+   817→   817→                        </div>
+   818→   818→                        <div>
+   819→   819→                          <div className="text-[10px] text-slate-500 mb-0.5">
+   820→   820→                            ضمن التسامح
+   821→   821→                          </div>
+   822→   822→                          <div className="text-lg font-bold font-mono text-slate-200">
+   823→   823→                            {deviationSummary.passing}
+   824→   824→                            <span className="text-slate-600">/</span>
+   825→   825→                            {deviationSummary.total}
+   826→   826→                          </div>
+   827→   827→                        </div>
+   828→   828→                      </div>
+   829→   829→                    </div>
+   830→   830→                  )}
+   831→   831→
+   832→   832→                  {/* جدول المقارنة التفصيلي */}
+   833→   833→                  <div className="overflow-x-auto">
+   834→   834→                    <Table>
+   835→   835→                      <TableHeader>
+   836→   836→                        <TableRow className="border-b border-slate-700/40 hover:bg-transparent">
+   837→   837→                          <TableHead className="text-slate-400 text-xs font-semibold">
+   838→   838→                            المعامل
+   839→   839→                          </TableHead>
+   840→   840→                          <TableHead className="text-slate-400 text-xs font-semibold text-center">
+   841→   841→                            الرمز
+   842→   842→                          </TableHead>
+   843→   843→                          <TableHead className="text-slate-400 text-xs font-semibold text-left font-mono">
+   844→   844→                            المحسوب
+   845→   845→                          </TableHead>
+   846→   846→                          <TableHead className="text-slate-400 text-xs font-semibold text-left font-mono">
+   847→   847→                            المرجعي
+   848→   848→                          </TableHead>
+   849→   849→                          <TableHead className="text-slate-400 text-xs font-semibold text-center">
+   850→   850→                            الانحراف %
+   851→   851→                          </TableHead>
+   852→   852→                          <TableHead className="text-slate-400 text-xs font-semibold text-center">
+   853→   853→                            الحالة
+   854→   854→                          </TableHead>
+   855→   855→                        </TableRow>
+   856→   856→                      </TableHeader>
+   857→   857→                      <TableBody>
+   858→   858→                        {deviations.map((dev, idx) => (
+   859→   859→                          <TableRow
+   860→   860→                            key={dev.symbol}
+   861→   861→                            className={`border-b border-slate-800/60 ${
+   862→   862→                              idx % 2 === 0 ? 'bg-slate-800/20' : ''
+   863→   863→                            } hover:bg-slate-800/40`}
+   864→   864→                          >
+   865→   865→                            <TableCell className="text-xs text-slate-300 font-medium py-2.5">
+   866→   866→                              {dev.label}
+   867→   867→                            </TableCell>
+   868→   868→                            <TableCell className="text-xs text-center py-2.5">
+   869→   869→                              <Badge
+   870→   870→                                variant="outline"
+   871→   871→                                className="border-slate-600/50 text-emerald-400 font-mono text-[11px] px-1.5 py-0"
+   872→   872→                              >
+   873→   873→                                {dev.symbol}
+   874→   874→                              </Badge>
+   875→   875→                            </TableCell>
+   876→   876→                            <TableCell className="text-xs text-left font-mono text-slate-200 py-2.5">
+   877→   877→                              {fmt(dev.computed, 6)}
+   878→   878→                            </TableCell>
+   879→   879→                            <TableCell className="text-xs text-left font-mono text-slate-400 py-2.5">
+   880→   880→                              {fmt(dev.reference, 6)}
+   881→   881→                            </TableCell>
+   882→   882→                            <TableCell
+   883→   883→                              className={`text-xs text-center font-mono font-bold py-2.5 ${getDeviationColor(
+   884→   884→                                dev.deviationPct
+   885→   885→                              )}`}
+   886→   886→                            >
+   887→   887→                              {fmt(dev.deviationPct, 2)}%
+   888→   888→                            </TableCell>
+   889→   889→                            <TableCell className="text-center py-2.5">
+   890→   890→                              {dev.deviationPct < 1 ? (
+   891→   891→                                <CheckCircle2 className="size-4 text-emerald-400 inline-block" />
+   892→   892→                              ) : dev.deviationPct < 5 ? (
+   893→   893→                                <AlertTriangle className="size-4 text-amber-400 inline-block" />
+   894→   894→                              ) : (
+   895→   895→                                <AlertTriangle className="size-4 text-red-400 inline-block" />
+   896→   896→                              )}
+   897→   897→                            </TableCell>
+   898→   898→                          </TableRow>
+   899→   899→                        ))}
+   900→   900→                      </TableBody>
+   901→   901→                    </Table>
+   902→   902→                  </div>
+   903→   903→
+   904→   904→                  {/* دليل الألوان */}
+   905→   905→                  <div className="flex items-center gap-6 text-[10px] text-slate-500 pt-2">
+   906→   906→                    <div className="flex items-center gap-1.5">
+   907→   907→                      <div className="size-2.5 rounded-full bg-emerald-400" />
+   908→   908→                      <span>انحراف &lt; 1% — مطابقة ممتازة</span>
+   909→   909→                    </div>
+   910→   910→                    <div className="flex items-center gap-1.5">
+   911→   911→                      <div className="size-2.5 rounded-full bg-amber-400" />
+   912→   912→                      <span>انحراف &lt; 5% — ضمن التسامح</span>
+   913→   913→                    </div>
+   914→   914→                    <div className="flex items-center gap-1.5">
+   915→   915→                      <div className="size-2.5 rounded-full bg-red-400" />
+   916→   916→                      <span>انحراف ≥ 5% — خارج التسامح</span>
+   917→   917→                    </div>
+   918→   918→                  </div>
+   919→   919→                </div>
+   920→   920→              )}
+   921→   921→            </CardContent>
+   922→   922→          </Card>
+   923→   923→        </TabsContent>
+   924→   924→
+   925→   925→        {/* ─── المعادلات المرجعية ─── */}
+   926→   926→        <TabsContent value="formulas" className="mt-4">
+   927→   927→          <Card className="bg-slate-900 border-slate-800">
+   928→   928→            <CardHeader className="pb-3">
+   929→   929→              <CardTitle className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+   930→   930→                <BookOpen className="size-4 text-slate-400" />
+   931→   931→                المعادلات المرجعية — الأطروحة (Eq. 13-19)
+   932→   932→              </CardTitle>
+   933→   933→              <CardDescription className="text-xs text-slate-500">
+   934→   934→                المعادلات الأساسية المستخدمة في محرك الاختراق مع الشرح العربي
+   935→   935→              </CardDescription>
+   936→   936→            </CardHeader>
+   937→   937→            <CardContent>
+   938→   938→              <div className="space-y-4">
+   939→   939→                {/* المعادلة 14: λ₁ */}
+   940→   940→                <div className="bg-slate-800/40 rounded-lg p-4 border border-slate-700/30">
+   941→   941→                  <div className="flex items-center justify-between mb-2">
+   942→   942→                    <div className="flex items-center gap-2">
+   943→   943→                      <Badge className="bg-emerald-600/20 text-emerald-400 border-emerald-500/30 font-mono text-[10px]">
+   944→   944→                        Eq.14
+   945→   945→                      </Badge>
+   946→   946→                      <span className="text-sm font-semibold text-slate-200">
+   947→   947→                        معامل شكل الرأس الحربي
+   948→   948→                      </span>
+   949→   949→                    </div>
+   950→   950→                    <Badge
+   951→   951→                      variant="outline"
+   952→   952→                      className="border-slate-600/50 text-emerald-400 font-mono text-[11px]"
+   953→   953→                    >
+   954→   954→                      λ₁ = {fmt(STEP3_PENETRATION.lambda1, 6)}
+   955→   955→                    </Badge>
+   956→   956→                  </div>
+   957→   957→                  <div className="bg-slate-950/50 rounded p-3 font-mono text-sm text-emerald-300 mb-2 text-center tracking-wider" dir="ltr">
+   958→   958→                    λ₁ = 0.5 + 0.4 × (Lh/D)^(2/3)
+   959→   959→                  </div>
+   960→   960→                  <p className="text-[11px] text-slate-400 leading-relaxed">
+   961→   961→                    يحسب تأثير شكل رأس القنبلة على عمق الاختراق. كلما زادت نسبة طول الرأس
+   962→   962→                    للقطر (Lh/D)، زادت قدرة القنبلة على الاختراق. القيمة المرجعية لـ MK83:
+   963→   963→                    Lh/D = {STEP2_INPUTS.lhd_ratio}
+   964→   964→                  </p>
+   965→   965→                </div>
+   966→   966→
+   967→   967→                {/* المعادلة 15: λ₂ */}
+   968→   968→                <div className="bg-slate-800/40 rounded-lg p-4 border border-slate-700/30">
+   969→   969→                  <div className="flex items-center justify-between mb-2">
+   970→   970→                    <div className="flex items-center gap-2">
+   971→   971→                      <Badge className="bg-emerald-600/20 text-emerald-400 border-emerald-500/30 font-mono text-[10px]">
+   972→   972→                        Eq.15
+   973→   973→                      </Badge>
+   974→   974→                      <span className="text-sm font-semibold text-slate-200">
+   975→   975→                        معامل تأثير القطر
+   976→   976→                      </span>
+   977→   977→                    </div>
+   978→   978→                    <Badge
+   979→   979→                      variant="outline"
+   980→   980→                      className="border-slate-600/50 text-emerald-400 font-mono text-[11px]"
+   981→   981→                    >
+   982→   982→                      λ₂ = {fmt(STEP3_PENETRATION.lambda2, 6)}
+   983→   983→                    </Badge>
+   984→   984→                  </div>
+   985→   985→                  <div className="bg-slate-950/50 rounded p-3 font-mono text-sm text-emerald-300 mb-2 text-center tracking-wider" dir="ltr">
+   986→   986→                    λ₂ = 2.8 × d^(1/3) − 1.3 × d^(1/2)
+   987→   987→                  </div>
+   988→   988→                  <p className="text-[11px] text-slate-400 leading-relaxed">
+   989→   989→                    يحسب تأثير قطر القنبلة على الاختراق. التعويض عن قطر MK83:
+   990→   990→                    d = {STEP2_INPUTS.dk} m
+   991→   991→                  </p>
+   992→   992→                </div>
+   993→   993→
+   994→   994→                {/* المعادلة 19: C_ef */}
+   995→   995→                <div className="bg-slate-800/40 rounded-lg p-4 border border-slate-700/30">
+   996→   996→                  <div className="flex items-center justify-between mb-2">
+   997→   997→                    <div className="flex items-center gap-2">
+   998→   998→                      <Badge className="bg-emerald-600/20 text-emerald-400 border-emerald-500/30 font-mono text-[10px]">
+   999→   999→                        Eq.19
+  1000→  1000→                      </Badge>
+  1001→  1001→                      <span className="text-sm font-semibold text-slate-200">
+  1002→  1002→                        الشحنة الفعالة
+  1003→  1003→                      </span>
+  1004→  1004→                    </div>
+  1005→  1005→                    <Badge
+  1006→  1006→                      variant="outline"
+  1007→  1007→                      className="border-slate-600/50 text-emerald-400 font-mono text-[11px]"
+  1008→  1008→                    >
+  1009→  1009→                      C_ef = {fmt(STEP3_PENETRATION.C_ef, 2)} kg
+  1010→  1010→                    </Badge>
+  1011→  1011→                  </div>
+  1012→  1012→                  <div className="bg-slate-950/50 rounded p-3 font-mono text-sm text-emerald-300 mb-2 text-center tracking-wider" dir="ltr">
+  1013→  1013→                    C_eff = 0.95 × K₁ × C
+  1014→  1014→                  </div>
+  1015→  1015→                  <p className="text-[11px] text-slate-400 leading-relaxed">
+  1016→  1016→                    وزن الشحنة المتفجرة الفعالة بعد الأخذ بالاعتبار معامل المتفجرات K₁
+  1017→  1017→                    ومعامل الفعالية 0.95. التعويض: K₁ = {STEP2_LOOKUPS.K1}، C = {STEP2_INPUTS.C} kg
+  1018→  1018→                  </p>
+  1019→  1019→                </div>
+  1020→  1020→
+  1021→  1021→                {/* المعادلة 13: h_pr */}
+  1022→  1022→                <div className="bg-slate-800/40 rounded-lg p-4 border border-emerald-500/20 ring-1 ring-emerald-500/10">
+  1023→  1023→                  <div className="flex items-center justify-between mb-2">
+  1024→  1024→                    <div className="flex items-center gap-2">
+  1025→  1025→                      <Badge className="bg-emerald-600/20 text-emerald-400 border-emerald-500/30 font-mono text-[10px]">
+  1026→  1026→                        Eq.13
+  1027→  1027→                      </Badge>
+  1028→  1028→                      <span className="text-sm font-semibold text-emerald-300">
+  1029→  1029→                        عمق الاختراق — المعادلة الرئيسية
+  1030→  1030→                      </span>
+  1031→  1031→                    </div>
+  1032→  1032→                    <Badge
+  1033→  1033→                      variant="outline"
+  1034→  1034→                      className="border-emerald-500/30 text-emerald-400 font-mono text-[11px]"
+  1035→  1035→                    >
+  1036→  1036→                      h_pr = {fmt(STEP3_PENETRATION.h_pr, 4)} m
+  1037→  1037→                    </Badge>
+  1038→  1038→                  </div>
+  1039→  1039→                  <div className="bg-slate-950/50 rounded p-3 font-mono text-sm text-emerald-300 mb-2 text-center tracking-wider" dir="ltr">
+  1040→  1040→                    x₁ = λ₁ × λ₂ × Kpr × (P/d²) × V × cos(α)
+  1041→  1041→                  </div>
+  1042→  1042→                  <p className="text-[11px] text-slate-400 leading-relaxed">
+  1043→  1043→                    المعادلة الأساسية لعمق الاختراق في التربة. تعتمد على معاملات الشكل والقطر
+  1044→  1044→                    ومعامل التربة وسرعة الاصطدام وزاوية السقوط. التعويض المرجعي:
+  1045→  1045→                    λ₁={fmt(STEP3_PENETRATION.lambda1, 4)}،
+  1046→  1046→                    λ₂={fmt(STEP3_PENETRATION.lambda2, 4)}،
+  1047→  1047→                    Kpr={STEP2_LOOKUPS.kpr_g.toExponential(1)}،
+  1048→  1048→                    P={STEP2_INPUTS.P}kg،
+  1049→  1049→                    d={STEP2_INPUTS.dk}m،
+  1050→  1050→                    V={STEP2_INPUTS.V}m/s،
+  1051→  1051→                    α={STEP2_INPUTS.alpha}°
+  1052→  1052→                  </p>
+  1053→  1053→                </div>
+  1054→  1054→
+  1055→  1055→                {/* المعادلة 17: τ (قنبلة خارقة) */}
+  1056→  1056→                <div className="bg-slate-800/40 rounded-lg p-4 border border-slate-700/30">
+  1057→  1057→                  <div className="flex items-center justify-between mb-2">
+  1058→  1058→                    <div className="flex items-center gap-2">
+  1059→  1059→                      <Badge className="bg-emerald-600/20 text-emerald-400 border-emerald-500/30 font-mono text-[10px]">
+  1060→  1060→                        Eq.17
+  1061→  1061→                      </Badge>
+  1062→  1062→                      <span className="text-sm font-semibold text-slate-200">
+  1063→  1063→                        معامل زاوية الاختراق — قنبلة خارقة
+  1064→  1064→                      </span>
+  1065→  1065→                    </div>
+  1066→  1066→                    <Badge
+  1067→  1067→                      variant="outline"
+  1068→  1068→                      className="border-slate-600/50 text-emerald-400 font-mono text-[11px]"
+  1069→  1069→                    >
+  1070→  1070→                      τ = {fmt(STEP3_PENETRATION.tsu, 4)} m
+  1071→  1071→                    </Badge>
+  1072→  1072→                  </div>
+  1073→  1073→                  <div className="bg-slate-950/50 rounded p-3 font-mono text-sm text-emerald-300 mb-2 text-center tracking-wider" dir="ltr">
+  1074→  1074→                    τ = 0.5 × lₖ × cos((α + n×α)/2)
+  1075→  1075→                  </div>
+  1076→  1076→                  <p className="text-[11px] text-slate-400 leading-relaxed">
+  1077→  1077→                    تصحيح عمق الاختراق حسب زاوية السقوط. يُستخدم للقنابل الخارقة
+  1078→  1078→                    (Lh/D &gt; 1.5). التعويض: lₖ={STEP2_INPUTS.lk}m، α={STEP2_INPUTS.alpha}°، n={STEP3_PENETRATION.n_exp}
+  1079→  1079→                  </p>
+  1080→  1080→                </div>
+  1081→  1081→
+  1082→  1082→                {/* القيم المشتقة */}
+  1083→  1083→                <Separator className="bg-slate-700/40" />
+  1084→  1084→                <div className="text-xs text-slate-400 font-medium mb-2">
+  1085→  1085→                  القيم المشتقة الإضافية:
+  1086→  1086→                </div>
+  1087→  1087→                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+  1088→  1088→                  {[
+  1089→  1089→                    {
+  1090→  1090→                      label: 'العمق الصافي',
+  1091→  1091→                      formula: 'h_z = h_pr − τ',
+  1092→  1092→                      value: `${fmt(STEP3_PENETRATION.h_z, 4)} m`,
+  1093→  1093→                    },
+  1094→  1094→                    {
+  1095→  1095→                      label: 'العمق المختزل',
+  1096→  1096→                      formula: 'h̄_z = h_z / ∛C_ef',
+  1097→  1097→                      value: fmt(STEP3_PENETRATION.h_z_bar, 4),
+  1098→  1098→                    },
+  1099→  1099→                    {
+  1100→  1100→                      label: 'فرق العمق',
+  1101→  1101→                      formula: 'Y_diff = Z − h_pr',
+  1102→  1102→                      value: `${fmt(STEP3_PENETRATION.Y_diff, 4)} m`,
+  1103→  1103→                    },
+  1104→  1104→                    {
+  1105→  1105→                      label: 'البعد المختزل',
+  1106→  1106→                      formula: 'Zp = R_actual / ∛C_ef',
+  1107→  1107→                      value: fmt(STEP3_PENETRATION.Zp, 4),
+  1108→  1108→                    },
+  1109→  1109→                  ].map((item, idx) => (
+  1110→  1110→                    <div
+  1111→  1111→                      key={idx}
+  1112→  1112→                      className="bg-slate-800/30 rounded-lg p-3 border border-slate-700/20"
+  1113→  1113→                    >
+  1114→  1114→                      <div className="text-[10px] text-slate-500 mb-1">
+  1115→  1115→                        {item.label}
+  1116→  1116→                      </div>
+  1117→  1117→                      <div className="font-mono text-xs text-emerald-400 mb-0.5" dir="ltr">
+  1118→  1118→                        {item.formula}
+  1119→  1119→                      </div>
+  1120→  1120→                      <div className="font-mono text-xs text-slate-300">
+  1121→  1121→                        = {item.value}
+  1122→  1122→                      </div>
+  1123→  1123→                    </div>
+  1124→  1124→                  ))}
+  1125→  1125→                </div>
+  1126→  1126→              </div>
+  1127→  1127→            </CardContent>
+  1128→  1128→          </Card>
+  1129→  1129→        </TabsContent>
+  1130→  1130→      </Tabs>
+  1131→  1131→
+  1132→  1132→      {/* ═══════════════════════════════════════════════════════════════ */}
+  1133→  1133→      {/* تحذيرات المحرك                                                */}
+  1134→  1134→      {/* ═══════════════════════════════════════════════════════════════ */}
+  1135→  1135→      {engineResults?.engine.warningMessages &&
+  1136→  1136→        engineResults.engine.warningMessages.length > 0 && (
+  1137→  1137→          <Card className="bg-slate-900 border-amber-500/20">
+  1138→  1138→            <CardContent className="p-4">
+  1139→  1139→              <div className="flex items-center gap-2 text-amber-400 mb-3">
+  1140→  1140→                <AlertTriangle className="size-4" />
+  1141→  1141→                <span className="text-sm font-medium">تحذيرات المحرك</span>
+  1142→  1142→              </div>
+  1143→  1143→              <div className="space-y-2">
+  1144→  1144→                {engineResults.engine.warningMessages.map((msg, idx) => (
+  1145→  1145→                  <div
+  1146→  1146→                    key={idx}
+  1147→  1147→                    className="bg-amber-500/5 border border-amber-500/10 rounded px-3 py-2"
+  1148→  1148→                  >
+  1149→  1149→                    <p className="text-xs text-amber-300/80 font-mono">{msg}</p>
+  1150→  1150→                  </div>
+  1151→  1151→                ))}
+  1152→  1152→              </div>
+  1153→  1153→            </CardContent>
+  1154→  1154→          </Card>
+  1155→  1155→        )}
+  1156→  1156→
+  1157→  1157→      {/* ═══════════════════════════════════════════════════════════════ */}
+  1158→  1158→      {/* شرح المحرك                                                    */}
+  1159→  1159→      {/* ═══════════════════════════════════════════════════════════════ */}
+  1160→  1160→      {engineResults?.engine.explanation && (
+  1161→  1161→        <Card className="bg-slate-900 border-slate-800">
+  1162→  1162→          <CardContent className="p-4">
+  1163→  1163→            <div className="flex items-center gap-2 text-slate-300 mb-2">
+  1164→  1164→              <BookOpen className="size-4 text-slate-400" />
+  1165→  1165→              <span className="text-sm font-medium">شرح النتائج</span>
+  1166→  1166→            </div>
+  1167→  1167→            <p className="text-xs text-slate-400 leading-relaxed font-mono">
+  1168→  1168→              {engineResults.engine.explanation}
+  1169→  1169→            </p>
+  1170→  1170→          </CardContent>
+  1171→  1171→        </Card>
+  1172→  1172→      )}
+  1173→  1173→    </div>
+  1174→  1174→  );
+  1175→  1175→}
+  1176→  1176→
