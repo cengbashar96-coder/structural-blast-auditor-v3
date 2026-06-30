@@ -3,13 +3,13 @@
  * 🔌 عميل قاعدة البيانات الموحد — Database Client Singleton
  * ═══════════════════════════════════════════════════════════════════════
  *
- * في بيئة Netlify Serverless: يستخدم Supabase REST API
- * بدلاً من PrismaClient الذي لا يستطيع الاتصال عبر TCP.
+ * تبديل تلقائي بين Supabase REST API و SQLite المحلي:
+ *   - إذا Supabase متاح → يستخدم REST API
+ *   - خلاف ذلك → يستخدم SQLite المحلي (أوفلاين)
  *
- * ⚠️ جميع عمليات قاعدة البيانات تمر عبر Supabase REST API
- * ⚠️ لا تستخدم PrismaClient مباشرة في Server Actions
+ * ⚠️ لإجبار الوضع الأوفلاين: FORCE_OFFLINE=true
  * ═══════════════════════════════════════════════════════════════════════
  */
 
-// تصدير Supabase adapter كـ prisma و db للتوافق مع الكود الحالي
-export { supabaseDb as prisma, supabaseDb as db } from './supabase-adapter';
+// تصدير المحول الموحد كـ prisma و db
+export { unifiedDb as prisma, unifiedDb as db, checkDatabaseConnection } from './unified-adapter';

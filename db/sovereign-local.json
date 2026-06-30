@@ -1,0 +1,37 @@
+{
+  "User": [
+    {
+      "email": "abu-sulaiman@structural-blast.sy",
+      "displayName": "المهندس أبو سليمان",
+      "passwordHash": "$2b$12$LiZF/E7LqZH.4ssXvqfC3ulrjpF6.1KutapDU.TCpNGut7zvWldei",
+      "role": "ADMIN",
+      "syndicateId": "SYR-ENG-ADMIN-001",
+      "specialization": "هندسة إنشائية - تحقق من أحمال الانفجار",
+      "subscriptionStatus": "APPROVED",
+      "permissions": [
+        "CAN_RUN_ENGINE",
+        "CAN_MODIFY_INPUTS",
+        "CAN_VIEW_REPORTS",
+        "CAN_EXPORT_DATA",
+        "CAN_MODIFY_BASELINE",
+        "CAN_MANAGE_PROJECTS",
+        "CAN_AUDIT"
+      ],
+      "approvedBy": "SYSTEM_SEED",
+      "statusChangedAt": "2026-06-30T17:09:54.480Z",
+      "id": "874b1dcc-7827-4442-82cc-2692d75670c2",
+      "createdAt": "2026-06-30T17:09:54.480Z",
+      "updatedAt": "2026-06-30T17:09:54.480Z"
+    }
+  ],
+  "Project": [],
+  "Scenario": [],
+  "RtmRecord": [],
+  "AuditLog": [],
+  "ProcessedEvent": [],
+  "_metadata": {
+    "version": 1,
+    "createdAt": "2026-06-30T17:09:53.922Z",
+    "lastModified": "2026-06-30T17:09:54.779Z"
+  }
+}

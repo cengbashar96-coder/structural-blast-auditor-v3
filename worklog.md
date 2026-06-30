@@ -80,3 +80,31 @@ Stage Summary:
 - الـ proxy يعمل: /dashboard → redirect إلى /auth/login (307)
 - المستخدم المدير: abu-sulaiman@structural-blast.sy / Admin@2024
 - جميع المكونات تعمل: REST API, bcrypt, crypto, proxy
+---
+Task ID: offline-mode
+Agent: Super Z
+Task: تحويل التطبيق للعمل أوفلاين بدون Supabase
+
+Work Log:
+- استكشاف بنية المشروع وتحليل جميع ملفات قاعدة البيانات والمصادقة
+- إنشاء محول SQLite محلي (sqlite-adapter.ts) باستخدام better-sqlite3
+- إنشاء محول JSON محلي (json-adapter.ts) كبديل مستقر بدون وحدات أصلية
+- إنشاء محول موحد (unified-adapter.ts) يبدل تلقائياً بين Supabase و JSON
+- تحديث ملفات إعادة التصدير (prisma.ts, db.ts) لاستخدام المحول الموحد
+- إضافة checkDatabaseConnection للمحول الموحد
+- تحديث next.config.ts لدعم الحزم الخارجية
+- حل مشكلة تعارض middleware.ts مع proxy.ts في Next.js 16
+- إنشاء .env.local لإعداد الوضع الأوفلاين تلقائياً
+- بناء واختبار التطبيق بنجاح أوفلاين
+
+Stage Summary:
+- التطبيق يعمل أوفلاين بالكامل عبر قاعدة بيانات JSON محلية
+- تسجيل الدخول والجلسات يعملان بدون اتصال بالإنترنت
+- بذر تلقائي لحساب المدير الافتراضي (abu-sulaiman@structural-blast.sy / Admin@2024)
+- تبديل تلقائي: FORCE_OFFLINE=true أو غياب متغيرات Supabase → JSON محلي
+- جميع API routes تعمل: auth-login, auth-session, auth-logout, setup-db, health
+- ملفات تم إنشاؤها:
+  - src/lib/db/json-adapter.ts (قاعدة بيانات JSON محلية)
+  - src/lib/db/sqlite-adapter.ts (قاعدة بيانات SQLite محلية)
+  - src/lib/db/unified-adapter.ts (محول موحد)
+  - .env.local (إعدادات الوضع الأوفلاين)

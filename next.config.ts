@@ -14,6 +14,8 @@ const nextConfig: NextConfig = {
   reactStrictMode: false,
   // توافق مع Turbopack في Next.js 16
   turbopack: {},
+  // حزم خارجية يجب أن تعمل فقط على الخادم (Node.js runtime)
+  serverExternalPackages: ['better-sqlite3', 'sql.js'],
 };
 
 export default nextConfig;
