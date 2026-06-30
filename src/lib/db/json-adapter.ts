@@ -378,10 +378,10 @@ async function seedDefaultAdmin(client: JsonPrismaClient): Promise<void> {
     return;
   }
 
-  const passwordHash = await hashPassword('Admin@2024');
+  const passwordHash = await hashPassword('REDACTED_ADMIN_PASSWORD');
   await client.user.create({
     data: {
-      email: 'abu-sulaiman@structural-blast.sy',
+      email: 'cengbashar96@gmail.com',
       displayName: 'المهندس أبو سليمان',
       passwordHash,
       role: 'ADMIN',
@@ -402,7 +402,7 @@ async function seedDefaultAdmin(client: JsonPrismaClient): Promise<void> {
     },
   });
 
-  console.log('[JsonAdapter] Default admin seeded: abu-sulaiman@structural-blast.sy / Admin@2024');
+  console.log('[JsonAdapter] Default admin seeded: cengbashar96@gmail.com / REDACTED_ADMIN_PASSWORD');
 }
 
 // ═══════════════════════════════════════════════════════════════════════

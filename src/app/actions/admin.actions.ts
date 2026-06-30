@@ -144,10 +144,10 @@ export async function seedDefaultAdminAction(): Promise<AdminActionResult> {
     }
 
     // بذر حساب المدير الافتراضي
-    const defaultPasswordHash = await hashPassword('Admin@2024');
+    const defaultPasswordHash = await hashPassword('REDACTED_ADMIN_PASSWORD');
     const admin = await prisma.user.create({
       data: {
-        email: 'abu-sulaiman@structural-blast.sy',
+        email: 'cengbashar96@gmail.com',
         displayName: 'المهندس أبو سليمان',
         passwordHash: defaultPasswordHash,
         role: USER_ROLES.ADMIN,

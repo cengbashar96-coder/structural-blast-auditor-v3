@@ -1,16 +1,17 @@
 /**
- * واجهة تسجيل الدخول — Login Form
+ * واجهة تسجيل الدخول — Login Form V2
  *
  * نموذج مصادقة المستخدمين مع:
  *   - البريد الإلكتروني
  *   - كلمة المرور
- *   - إرسال عبر Server Action (loginAction)
+ *   - إرسال عبر API Route (أكثر موثوقية على Netlify)
+ *   - دعم وضع الأوفلاين (JSON محلي + FORCE_OFFLINE=true)
+ *   - إعادة توجيه ذكية حسب الدور
  */
 'use client';
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { loginAction } from '@/app/actions/auth.actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -29,22 +30,36 @@ export function LoginForm() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
 
     startTransition(async () => {
-      const formData = new FormData();
-      formData.append('email', email);
-      formData.append('password', password);
+      try {
+        // استخدام API Route بدلاً من Server Action
+        // لأنه أكثر موثوقية على Netlify Serverless Functions
+        const response = await fetch('/api/auth-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
 
-      const result = await loginAction(formData);
+        const data = await response.json();
 
-      if (result.success) {
-        // تحويل حسب الدور
-        router.push('/dashboard');
-      } else {
-        setError(result.error || 'فشل تسجيل الدخول');
+        if (data.success) {
+          // إعادة توجيه ذكية حسب الدور
+          if (data.user?.role === 'ADMIN') {
+            router.push('/admin');
+          } else {
+            router.push('/dashboard');
+          }
+          // إجبار تحديث الصفحة لتحميل بيانات الجلسة
+          router.refresh();
+        } else {
+          setError(data.error || 'فشل تسجيل الدخول');
+        }
+      } catch (err) {
+        setError('حدث خطأ في الاتصال — تحقق من اتصال الشبكة');
       }
     });
   }
@@ -80,7 +95,7 @@ export function LoginForm() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="ahmed@engineering-sy.org"
+              placeholder="cengbashar96@gmail.com"
               className="bg-slate-800 border-slate-600 text-slate-100 placeholder:text-slate-500"
               dir="ltr"
               disabled={isPending}

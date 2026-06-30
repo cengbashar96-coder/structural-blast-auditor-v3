@@ -32,7 +32,7 @@ import { USER_ROLES, type RbacUser } from '@/lib/rbac';
 const SESSION_COOKIE_NAME = 'sbv3-session';
 
 /** عمر الجلسة بالثواني: 30 دقيقة */
-const SESSION_MAX_AGE = 30 * 60; // 1800 ثانية
+export const SESSION_MAX_AGE = 30 * 60; // 1800 ثانية
 
 /** واجهة بيانات الجلسة الكاملة */
 export interface UserSession {

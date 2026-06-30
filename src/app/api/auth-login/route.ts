@@ -1,11 +1,10 @@
 /**
  * ═══════════════════════════════════════════════════════════════════════
- * 🔐 API Route لتسجيل الدخول — Login API Route
+ * 🔐 API Route لتسجيل الدخول — Login API Route V2
  * ═══════════════════════════════════════════════════════════════════════
  *
  * بديل موثوق لـ Server Action — يعمل بشكل مضمون على Netlify
- * Server Actions في Next.js 16 على Netlify تعيد HTTP 500
- * بينما API Routes تعمل بشكل مثالي (مُتحقق من /api/setup-db)
+ * وكذلك في الوضع الأوفلاين (FORCE_OFFLINE=true + JSON محلي)
  *
  * POST /api/auth-login
  * Body: { email: string, password: string }
@@ -15,12 +14,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { verifyPassword } from '@/lib/password';
-import { createUserSession, setSessionCookie } from '@/lib/session';
+import { getCryptoVault } from '@/lib/crypto-vault';
+import { createUserSession, type UserSession } from '@/lib/session';
 import { USER_ROLES } from '@/lib/rbac';
 import { generateSovereignId } from '@/lib/id-utility';
 import { dispatchToAuditQueue, AUDIT_EVENTS, AUDIT_SEVERITY } from '@/lib/audit';
 
 export const dynamic = 'force-dynamic';
+
+/** اسم حلوية الجلسة */
+const SESSION_COOKIE_NAME = 'sbv3-session';
+
+/** عمر الجلسة بالثواني: 30 دقيقة */
+const SESSION_MAX_AGE = 30 * 60;
 
 export async function POST(request: NextRequest) {
   const contextId = generateSovereignId('CTX');
@@ -48,7 +54,9 @@ export async function POST(request: NextRequest) {
     // ─── البحث عن المستخدم ───
     const user = await prisma.user.findUnique({
       where: { email },
-    });
+    }) as any;
+
+    console.log(`[AuthLogin] User lookup for ${email}:`, user ? `found (role=${user.role})` : 'NOT FOUND');
 
     if (!user) {
       dispatchToAuditQueue({
@@ -68,6 +76,8 @@ export async function POST(request: NextRequest) {
 
     // ─── التحقق من كلمة المرور ───
     const isPasswordValid = await verifyPassword(password, user.passwordHash);
+
+    console.log(`[AuthLogin] Password valid: ${isPasswordValid}`);
 
     if (!isPasswordValid) {
       dispatchToAuditQueue({
@@ -112,7 +122,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ─── إنشاء الجلسة المشفرة ───
-    const session = createUserSession({
+    const session: UserSession = createUserSession({
       userId: user.id,
       role: user.role as USER_ROLES,
       displayName: user.displayName,
@@ -120,7 +130,32 @@ export async function POST(request: NextRequest) {
       specialization: user.specialization || undefined,
     });
 
-    await setSessionCookie(session);
+    // تشفير الجلسة وإنشاء الكوكي يدوياً
+    const vault = getCryptoVault();
+    const encryptedPayload = vault.encrypt(JSON.stringify(session));
+
+    console.log(`[AuthLogin] Session created for: ${user.email} (role=${user.role})`);
+
+    // إنشاء الاستجابة مع الكوكي
+    const response = NextResponse.json({
+      success: true,
+      contextId,
+      subscriptionStatus: user.subscriptionStatus,
+      user: {
+        userId: user.id,
+        displayName: user.displayName,
+        role: user.role,
+      },
+    });
+
+    // زرع كوكي الجلسة المشفرة مباشرة في رأس الاستجابة
+    response.cookies.set(SESSION_COOKIE_NAME, encryptedPayload, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: SESSION_MAX_AGE,
+      path: '/',
+    });
 
     dispatchToAuditQueue({
       contextId,
@@ -131,18 +166,10 @@ export async function POST(request: NextRequest) {
       description: `تسجيل دخول ناجح: ${user.email} بدور ${user.role}`,
     });
 
-    return NextResponse.json({
-      success: true,
-      contextId,
-      subscriptionStatus: user.subscriptionStatus,
-      user: {
-        userId: user.id,
-        displayName: user.displayName,
-        role: user.role,
-      },
-    });
+    return response;
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'خطأ غير معروف';
+    console.error('[AuthLogin] Error:', message);
 
     dispatchToAuditQueue({
       contextId,
@@ -154,7 +181,7 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(
-      { success: false, contextId, error: 'حدث خطأ أثناء تسجيل الدخول' },
+      { success: false, contextId, error: `حدث خطأ أثناء تسجيل الدخول: ${message}` },
       { status: 500 }
     );
   }
