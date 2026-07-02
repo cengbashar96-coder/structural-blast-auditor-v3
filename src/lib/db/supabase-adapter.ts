@@ -134,14 +134,18 @@ class SupabaseRestAdapter {
 
     if (options?.filters) {
       for (const filter of options.filters) {
-        const key = `${filter.column}.${filter.operator}`;
+        // PostgREST filter format: column=operator.value
+        // e.g. email=eq.cengbashar96@gmail.com
+        // URLSearchParams handles URL encoding automatically (@ → %40)
+        const key = filter.column;
         let value = filter.value;
         if (Array.isArray(value)) {
-          value = `.${value.join(',')}.`;
+          // PostgREST IN operator: column=in.(val1,val2,val3)
+          value = `(${value.map(v => String(v)).join(',')})`;
         } else if (value === null) {
           value = 'null';
         }
-        params[key] = String(value);
+        params[key] = `${filter.operator}.${String(value)}`;
       }
     }
 
