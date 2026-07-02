@@ -1,17 +1,11 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# ═══════════════════════════════════════════════════════════════════════
+# .gitignore — Structural Blast Auditor V3.0
+# ═══════════════════════════════════════════════════════════════════════
 
 # dependencies
 node_modules
 /.pnp
 .pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
-
-# testing
-/coverage
 
 # next.js
 /.next/
@@ -29,27 +23,45 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+*.log
 
-# env files (can opt-in for committing if needed)
+# env files
 .env*
 
 # vercel
 .vercel
 
-
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# ═══ ملفات مؤقتة/شرح — لا تُرفع في git ═══
 local-*
 .claude
 .z-ai-config
-*.log
-dev.log
-dev.out.log
-test
-!src/test/
 prompt
 
-server.log
-# Skills directory
+# ═══ ملفات النظام غير المطلوبة ═══
 /skills/
+/tool-results/
+/agent-ctx/
+/worklog.md
+
+# ═══ ملفات قديمة/شرح — تقليل حجم المستودع ═══
+/upload/
+/download/assets/
+/download/charts/
+/download/thesis_pages/
+*.pdf
+*.png
+*.jpg
+*.jpeg
+*.db
+bun.lock
+
+# ═══ سكريبتات توليد غير مطلوبة في الإنتاج ═══
+scripts/fonts/
+scripts/engine-analysis.md
+scripts/ui-analysis.md
+scripts/screenshot-analysis.txt
+scripts/generate-platform-docs.py
