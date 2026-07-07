@@ -25,6 +25,9 @@ import {
   Target,
   Zap,
   ArrowDownFromLine,
+  ArrowRightLeft,
+  Building2,
+  BookOpen,
 } from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -40,78 +43,86 @@ interface StepCardData {
   resultValue: string;
   isComplete: boolean;
   icon: React.ReactNode;
+  color: string;
 }
 
 const STEPS: StepCardData[] = [
   {
     stepNumber: '2',
-    nameAr: 'المدخلات',
-    descriptionAr: 'بيانات السلاح والتربة والاستيفاءات',
+    nameAr: 'المدخلات والجداول',
+    descriptionAr: 'بيانات السلاح والتربة والاستيفاءات المرجعية',
     href: '/dashboard/step2-inputs',
     resultLabel: 'C_ef',
     resultValue: `${FINAL_LOCKED_RESULTS.C_ef.toFixed(2)} kg`,
     isComplete: true,
     icon: <Layers className="size-5" />,
+    color: 'emerald',
   },
   {
     stepNumber: '3',
     nameAr: 'الاختراق',
-    descriptionAr: 'عمق اختراق القنبلة في التربة',
+    descriptionAr: 'عمق اختراق القنبلة في التربة (المعادلات 13-19)',
     href: '/dashboard/step3-penetration',
     resultLabel: 'h_pr',
     resultValue: `${FINAL_LOCKED_RESULTS.h_pr.toFixed(2)} m`,
     isComplete: true,
     icon: <Target className="size-5" />,
+    color: 'emerald',
   },
   {
     stepNumber: '5 سقف',
     nameAr: 'انفجار السقف',
-    descriptionAr: 'أحمال الانفجار على السقف',
+    descriptionAr: 'أحمال الانفجار على السقف — الضغط التصميمي',
     href: '/dashboard/step5-roof-blast',
     resultLabel: 'Pp',
     resultValue: `${STEP5_ROOF.Pp.toFixed(3)} kg/cm²`,
     isComplete: true,
-    icon: <Zap className="size-5" />,
+    icon: <ArrowDownFromLine className="size-5" />,
+    color: 'emerald',
   },
   {
     stepNumber: '5 جدار',
     nameAr: 'انفجار الجدار',
-    descriptionAr: 'أحمال الانفجار على الجدار',
+    descriptionAr: 'أحمال الانفجار على الجدران — الضغط التصميمي',
     href: '/dashboard/step5-wall-blast',
     resultLabel: 'Pp',
     resultValue: `${STEP5_WALL.Pp.toFixed(3)} kg/cm²`,
     isComplete: true,
-    icon: <Zap className="size-5" />,
+    icon: <ArrowRightLeft className="size-5" />,
+    color: 'emerald',
   },
   {
     stepNumber: '7',
     nameAr: 'تصميم السقف',
-    descriptionAr: 'السماكة والتسليح المطلوبان للسقف',
+    descriptionAr: 'المسار αm → ξ → h₀ → Hp = 70.46 cm',
     href: '/dashboard/step7-ceiling',
     resultLabel: 'Hp',
     resultValue: `${STEP7_CEILING.Hp_final.toFixed(2)} cm`,
     isComplete: true,
-    icon: <ArrowDownFromLine className="size-5" />,
+    icon: <Layers className="size-5" />,
+    color: 'emerald',
   },
   {
     stepNumber: '8',
     nameAr: 'تصميم الجدران',
-    descriptionAr: 'السماكة والتسليح المطلوبان للجدران',
+    descriptionAr: 'سماكة الجدار والأرضية والجدار الداخلي',
     href: '/dashboard/step8-wall',
     resultLabel: 'Hc',
     resultValue: `${STEP8_WALL.Hc_final.toFixed(2)} cm`,
     isComplete: true,
-    icon: <Shield className="size-5" />,
+    icon: <Building2 className="size-5" />,
+    color: 'emerald',
   },
   {
     stepNumber: '—',
     nameAr: 'الأطروحة والمقارنة',
-    descriptionAr: 'مقارنة الأشكال الإنشائية الثلاثة',
+    descriptionAr: 'مقارنة الأشكال الثلاثة: مستطيل / قوسي / دائري',
     href: '/dashboard/thesis-comparison',
     resultLabel: 'الشكل الموصى به',
     resultValue: 'مستطيل/قوسي/دائري',
-    isComplete: false,
-    icon: <CheckCircle2 className="size-5" />,
+    isComplete: true,
+    icon: <BookOpen className="size-5" />,
+    color: 'amber',
   },
 ];
 
@@ -122,7 +133,6 @@ const STEPS: StepCardData[] = [
 function getRecommendedGeometryLabel(): string {
   try {
     const pDesignMpaRoof = STEP5_ROOF.Pp / 10.197;
-    const pDesignMpaWall = STEP5_WALL.Pp / 10.197;
     const fcMpa = 20;
     const fyMpa = 300;
     const ap = 4;
@@ -176,38 +186,16 @@ interface SummaryItem {
   symbol: string;
   value: string;
   unit: string;
+  accent?: boolean;
 }
 
 const SUMMARY_RESULTS: SummaryItem[] = [
-  { label: 'سماكة السقف', symbol: 'Hp', value: FINAL_LOCKED_RESULTS.Hp_final.toFixed(2), unit: 'cm' },
+  { label: 'سماكة السقف', symbol: 'Hp', value: FINAL_LOCKED_RESULTS.Hp_final.toFixed(2), unit: 'cm', accent: true },
   { label: 'سماكة الجدار', symbol: 'Hc', value: FINAL_LOCKED_RESULTS.Hc_final.toFixed(2), unit: 'cm' },
   { label: 'سماكة الأساس', symbol: 'Hf', value: FINAL_LOCKED_RESULTS.Hf_final.toFixed(2), unit: 'cm' },
   { label: 'سماكة القبو', symbol: 'Hvct', value: FINAL_LOCKED_RESULTS.Hvct_final.toFixed(0), unit: 'cm' },
   { label: 'عمق الاختراق', symbol: 'h_pr', value: FINAL_LOCKED_RESULTS.h_pr.toFixed(2), unit: 'm' },
-];
-
-// ═══════════════════════════════════════════════════════════════════════
-// التنبيهات
-// ═══════════════════════════════════════════════════════════════════════
-
-interface AlertItem {
-  type: 'info' | 'warning';
-  message: string;
-}
-
-const ALERTS: AlertItem[] = [
-  {
-    type: 'info',
-    message: 'جميع القيم معروضة وفق الحالة المرجعية BMK-02 (MK83 + تربة متوسطة)',
-  },
-  {
-    type: 'warning',
-    message: 'الشحنة الفعالة C_ef = 334.77 kg — تأكد من تطابق بيانات السلاح مع المكتبة',
-  },
-  {
-    type: 'info',
-    message: 'سماكة القبو Hvct = 30 cm هي قيمة دنيا وفق الكود السوري 2024',
-  },
+  { label: 'الشحنة الفعالة', symbol: 'C_ef', value: FINAL_LOCKED_RESULTS.C_ef.toFixed(2), unit: 'kg' },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -226,7 +214,7 @@ export default function DashboardPage() {
             لوحة التحكم — المدقق الديناميكي الموحد
           </h1>
           <p className="text-slate-400 text-sm mt-1">
-            عرض ملخص لخط الحساب والنتائج النهائية المرجعية
+            عرض ملخص لخط الحساب والنتائج النهائية المرجعية — BMK-02 (MK83 + تربة متوسطة)
           </p>
         </div>
         <Badge
@@ -241,20 +229,26 @@ export default function DashboardPage() {
       <section>
         <h2 className="text-lg font-semibold text-slate-200 mb-4 flex items-center gap-2">
           <Layers className="size-5 text-emerald-400" />
-          خط الحساب
+          خط الحساب — من المدخلات إلى القرار الإنشائي
         </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {STEPS.map((step) => (
             <Card
               key={step.href}
-              className="bg-slate-900/80 border-slate-800/60 hover:border-emerald-500/30 transition-colors group"
+              className={`bg-slate-900/80 border-slate-800/60 hover:border-emerald-500/30 transition-colors group ${
+                step.color === 'amber' ? 'border-amber-500/20' : ''
+              }`}
             >
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Badge
                       variant="outline"
-                      className="border-slate-700 text-slate-300 bg-slate-800/60 text-xs font-mono"
+                      className={`text-xs font-mono ${
+                        step.color === 'amber'
+                          ? 'border-amber-700 text-amber-300 bg-amber-900/30'
+                          : 'border-slate-700 text-slate-300 bg-slate-800/60'
+                      }`}
                     >
                       {step.stepNumber}
                     </Badge>
@@ -303,17 +297,19 @@ export default function DashboardPage() {
       <section>
         <h2 className="text-lg font-semibold text-slate-200 mb-4 flex items-center gap-2">
           <Target className="size-5 text-emerald-400" />
-          النتائج النهائية
+          النتائج النهائية المقفلة
         </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-4">
           {SUMMARY_RESULTS.map((item) => (
             <Card
               key={item.symbol}
-              className="bg-slate-900/80 border-slate-800/60 text-center"
+              className={`bg-slate-900/80 border-slate-800/60 text-center ${
+                item.accent ? 'border-emerald-500/30 ring-1 ring-emerald-500/20' : ''
+              }`}
             >
               <CardContent className="pt-4 pb-4 px-3 space-y-1">
                 <p className="text-xs text-slate-500">{item.label}</p>
-                <p className="text-xl font-bold text-emerald-400 font-mono">
+                <p className={`font-bold font-mono ${item.accent ? 'text-2xl text-emerald-400' : 'text-xl text-emerald-400/80'}`}>
                   {item.value}
                 </p>
                 <p className="text-xs text-slate-400">
@@ -323,10 +319,10 @@ export default function DashboardPage() {
             </Card>
           ))}
           {/* بطاقة الشكل الموصى به */}
-          <Card className="bg-slate-900/80 border-emerald-500/20 text-center">
+          <Card className="bg-slate-900/80 border-amber-500/20 text-center">
             <CardContent className="pt-4 pb-4 px-3 space-y-1">
               <p className="text-xs text-slate-500">الشكل الموصى به</p>
-              <p className="text-xl font-bold text-emerald-400">
+              <p className="text-xl font-bold text-amber-400">
                 {recommendedShape}
               </p>
               <p className="text-xs text-slate-400">مستطيل/قوسي/دائري</p>
@@ -335,30 +331,66 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {/* ─── 4. التنبيهات ─── */}
+      {/* ─── 4. تدفق البيانات ─── */}
+      <section>
+        <h2 className="text-lg font-semibold text-slate-200 mb-4 flex items-center gap-2">
+          <Zap className="size-5 text-emerald-400" />
+          تدفق البيانات بين الخطوات
+        </h2>
+        <Card className="bg-slate-900/80 border-slate-800/60 p-4">
+          <div className="flex flex-wrap items-center justify-center gap-2 text-sm">
+            <div className="flex items-center gap-1 bg-slate-800/80 px-3 py-2 rounded-lg border border-slate-700/50">
+              <Layers className="size-3.5 text-emerald-400" />
+              <span className="text-slate-300">خطوة 2</span>
+              <span className="text-emerald-400 font-mono text-xs">(C_ef)</span>
+            </div>
+            <ArrowLeft className="size-4 text-slate-600" />
+            <div className="flex items-center gap-1 bg-slate-800/80 px-3 py-2 rounded-lg border border-slate-700/50">
+              <Target className="size-3.5 text-emerald-400" />
+              <span className="text-slate-300">خطوة 3</span>
+              <span className="text-emerald-400 font-mono text-xs">(h_pr, R_actual)</span>
+            </div>
+            <ArrowLeft className="size-4 text-slate-600" />
+            <div className="flex items-center gap-1 bg-slate-800/80 px-3 py-2 rounded-lg border border-emerald-500/30">
+              <Zap className="size-3.5 text-emerald-400" />
+              <span className="text-slate-300">خطوة 5</span>
+              <span className="text-emerald-400 font-mono text-xs">(Pp, ω)</span>
+            </div>
+            <ArrowLeft className="size-4 text-slate-600" />
+            <div className="flex items-center gap-1 bg-slate-800/80 px-3 py-2 rounded-lg border border-emerald-500/30">
+              <ArrowDownFromLine className="size-3.5 text-emerald-400" />
+              <span className="text-slate-300">خطوة 7+8</span>
+              <span className="text-emerald-400 font-mono text-xs">(Hp, Hc)</span>
+            </div>
+            <ArrowLeft className="size-4 text-slate-600" />
+            <div className="flex items-center gap-1 bg-amber-900/20 px-3 py-2 rounded-lg border border-amber-500/30">
+              <BookOpen className="size-3.5 text-amber-400" />
+              <span className="text-amber-300">المقارنة</span>
+              <span className="text-amber-400 font-mono text-xs">(الشكل الأفضل)</span>
+            </div>
+          </div>
+        </Card>
+      </section>
+
+      {/* ─── 5. التنبيهات ─── */}
       <section>
         <h2 className="text-lg font-semibold text-slate-200 mb-4 flex items-center gap-2">
           <AlertTriangle className="size-5 text-amber-400" />
           التنبيهات والملاحظات
         </h2>
         <div className="space-y-2">
-          {ALERTS.map((alert, idx) => (
-            <div
-              key={idx}
-              className={`flex items-start gap-3 rounded-lg border px-4 py-3 text-sm ${
-                alert.type === 'warning'
-                  ? 'border-amber-500/30 bg-amber-500/5 text-amber-300'
-                  : 'border-slate-700/50 bg-slate-900/50 text-slate-400'
-              }`}
-            >
-              {alert.type === 'warning' ? (
-                <AlertTriangle className="size-4 mt-0.5 shrink-0 text-amber-400" />
-              ) : (
-                <CheckCircle2 className="size-4 mt-0.5 shrink-0 text-slate-500" />
-              )}
-              <span>{alert.message}</span>
-            </div>
-          ))}
+          <div className="flex items-start gap-3 rounded-lg border border-slate-700/50 bg-slate-900/50 px-4 py-3 text-sm text-slate-400">
+            <CheckCircle2 className="size-4 mt-0.5 shrink-0 text-emerald-500" />
+            <span>جميع القيم معروضة وفق الحالة المرجعية BMK-02 (MK83 + تربة متوسطة) — مقفلة ولا تُعاد كتابتها</span>
+          </div>
+          <div className="flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-300">
+            <AlertTriangle className="size-4 mt-0.5 shrink-0 text-amber-400" />
+            <span>الشحنة الفعالة C_ef = 334.77 kg — K₁ = 1.639 (Tritonal 80-20) — تأكد من تطابق بيانات السلاح مع المكتبة</span>
+          </div>
+          <div className="flex items-start gap-3 rounded-lg border border-slate-700/50 bg-slate-900/50 px-4 py-3 text-sm text-slate-400">
+            <Shield className="size-4 mt-0.5 shrink-0 text-emerald-500" />
+            <span>سماكة القبو Hvct = 30 cm هي قيمة دنيا وفق الكود السوري 2024 | مسار التصميم: αm → ξ → h₀ → Hp = h₀ × 1.05</span>
+          </div>
         </div>
       </section>
     </div>

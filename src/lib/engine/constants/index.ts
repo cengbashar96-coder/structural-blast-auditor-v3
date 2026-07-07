@@ -102,7 +102,14 @@ export function getSoilByCode(code: SoilTypeCode): SoilCoefficients {
 }
 
 export function getExplosiveK1(name: string): number {
-  const entry = EXPLOSIVE_COEFFICIENTS.find((e) => e.name === name);
+  // محاولة المطابقة المباشرة أولاً
+  let entry = EXPLOSIVE_COEFFICIENTS.find((e) => e.name === name);
+  // إذا لم تُنجح، محاولة مطابقة مرنة (مثل "Tritonal" → "Tritonal_80_20")
+  if (!entry) {
+    entry = EXPLOSIVE_COEFFICIENTS.find((e) =>
+      e.name.startsWith(name.split('_')[0]) || name.startsWith(e.name.split('_')[0])
+    );
+  }
   if (!entry) {
     console.warn(`[ENGINE-WARN] Unknown explosive: "${name}", falling back to TNT (K1=1.0)`);
     return 1.0;

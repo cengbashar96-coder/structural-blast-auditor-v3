@@ -11,7 +11,7 @@
     "ldRatio": 3.6,
     "lhdRatio": 1,
     "chargeKg": 23,
-    "explosiveType": "Tritonal"
+    "explosiveType": "Tritonal_80_20"
   },
   {
     "id": "W_AN_M57A1",
@@ -25,7 +25,7 @@
     "ldRatio": 3.4,
     "lhdRatio": 1,
     "chargeKg": 62,
-    "explosiveType": "Tritonal"
+    "explosiveType": "Tritonal_80_20"
   },
   {
     "id": "W_AN_M64A1",
@@ -39,7 +39,7 @@
     "ldRatio": 3.3,
     "lhdRatio": 1,
     "chargeKg": 128,
-    "explosiveType": "Tritonal"
+    "explosiveType": "Tritonal_80_20"
   },
   {
     "id": "W_M117_M",
@@ -53,7 +53,7 @@
     "ldRatio": 3.5,
     "lhdRatio": 1,
     "chargeKg": 177,
-    "explosiveType": "Tritonal"
+    "explosiveType": "Tritonal_80_20"
   },
   {
     "id": "W_AN_M65A1",
@@ -67,7 +67,7 @@
     "ldRatio": 2.8,
     "lhdRatio": 1,
     "chargeKg": 270,
-    "explosiveType": "Tritonal"
+    "explosiveType": "Tritonal_80_20"
   },
   {
     "id": "W_AN_M66A1",
@@ -81,7 +81,7 @@
     "ldRatio": 3.1,
     "lhdRatio": 1,
     "chargeKg": 526,
-    "explosiveType": "Tritonal"
+    "explosiveType": "Tritonal_80_20"
   },
   {
     "id": "W_3000_GENERIC",
@@ -95,7 +95,7 @@
     "ldRatio": 5.0,
     "lhdRatio": 1,
     "chargeKg": 816,
-    "explosiveType": "Tritonal"
+    "explosiveType": "Tritonal_80_20"
   },
   {
     "id": "W_MK81",
@@ -109,7 +109,7 @@
     "ldRatio": 5.2,
     "lhdRatio": 2.5,
     "chargeKg": 45,
-    "explosiveType": "Tritonal"
+    "explosiveType": "Tritonal_80_20"
   },
   {
     "id": "W_MK82",
@@ -123,7 +123,7 @@
     "ldRatio": 5.7,
     "lhdRatio": 2.5,
     "chargeKg": 87,
-    "explosiveType": "Tritonal"
+    "explosiveType": "Tritonal_80_20"
   },
   {
     "id": "W_MK83",
@@ -137,7 +137,7 @@
     "ldRatio": 5.3,
     "lhdRatio": 2,
     "chargeKg": 215,
-    "explosiveType": "Tritonal"
+    "explosiveType": "Tritonal_80_20"
   },
   {
     "id": "W_MK84",
@@ -151,7 +151,7 @@
     "ldRatio": 5.2,
     "lhdRatio": 2,
     "chargeKg": 430,
-    "explosiveType": "Tritonal"
+    "explosiveType": "Tritonal_80_20"
   },
   {
     "id": "W_MK81_SNEKAY",
@@ -165,7 +165,7 @@
     "ldRatio": 5.2,
     "lhdRatio": 2.5,
     "chargeKg": 45,
-    "explosiveType": "Tritonal"
+    "explosiveType": "Tritonal_80_20"
   },
   {
     "id": "W_MK82_SNEKAY",
@@ -179,7 +179,7 @@
     "ldRatio": 5.7,
     "lhdRatio": 2.5,
     "chargeKg": 87,
-    "explosiveType": "Tritonal"
+    "explosiveType": "Tritonal_80_20"
   },
   {
     "id": "W_M117R",
@@ -193,7 +193,7 @@
     "ldRatio": 3.5,
     "lhdRatio": 1,
     "chargeKg": 177,
-    "explosiveType": "Tritonal"
+    "explosiveType": "Tritonal_80_20"
   },
   {
     "id": "W_FAB_250",
