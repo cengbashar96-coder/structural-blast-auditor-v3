@@ -1,26 +1,19 @@
 ---
-Task ID: 1-10
-Agent: Super Z (Main)
-Task: إعادة هيكلة واجهات المنصة — تبسيط الحسابات والنتائج + إصلاح السماكات والمقارنة
+Task ID: 1
+Agent: main
+Task: إعادة هيكلة الواجهات + إصلاح المحرك + ملء BMK-01/03 + رفع GitHub
 
 Work Log:
-- إصلاح محرك structural-concrete-core.ts: استبدال المعادلة التقريبية بالمسار المُصحّح من الأطروحة (αm → ξ → h0 → Hp)
-- إصلاح محرك geometry-comparator.ts: إضافة معاملات تصحيح لكل شكل (GEOMETRY_FACTORS)، 5 معايير بدل 4
-- تحديث الشريط الجانبي (app-sidebar.tsx): 8 عناصر حساب + أدوات مساعدة
-- إنشاء 7 واجهات مستقلة جديدة:
-  - /dashboard/step2-inputs (المدخلات والجداول المرجعية)
-  - /dashboard/step3-penetration (حسابات الاختراق)
-  - /dashboard/step5-roof-blast (أحمال الانفجار على السقف)
-  - /dashboard/step5-wall-blast (أحمال الانفجار على الجدران)
-  - /dashboard/step7-ceiling (تصميم سماكة السقف)
-  - /dashboard/step8-wall (تصميم سماكة الجدران)
-  - /dashboard/thesis-comparison (الأطروحة والمقارنة بين الأشكال)
-- إعادة كتابة لوحة التحكم الرئيسية (dashboard/page.tsx): ملخص + تنقل سريع
-- إصلاح خطأ استيراد SquareArch في step7-ceiling
-- بناء ناجح لجميع الصفحات (next build ✓)
+- إصلاح نوع المتفجرات في weapons-library.json (Tritonal → Tritonal_80_20)
+- إصلاح دالة getExplosiveK1 بمطابقة مرنة
+- ملء قيم BMK-01 (FAB-250 + SOFT_SOIL): lambda1=1.1347, C_ef=95kg, x1=9.53m, Pso=0.287MPa
+- ملء قيم BMK-03 (FAB-1500 + HARD_ROCK): lambda1=1.1347, C_ef=646kg, x1=1.903m, sigma=260MPa
+- إعادة بناء 7 واجهات مستقلة + لوحة التحكم الرئيسية
+- اختبار البناء بنجاح (35 صفحة)
+- رفع التحديثات إلى git (commit محلي)
 
 Stage Summary:
-- 7 واجهات جديدة + واجهة رئيسية مُبسّطة
-- محرك السماكات مُصحّح (αm → ξ → h0 → Hp)
-- محرك المقارنة مُصحّح (معاملات ديناميكية لكل شكل)
-- جميع الصفحات تُبنى بنجاح وتستجيب (307 redirect for protected pages)
+- البناء ينجح: npx next build ✓
+- الواجهات: step2-inputs, step3-penetration, step5-roof-blast, step5-wall-blast, step7-ceiling, step8-wall, thesis-comparison
+- BMK-01 و BMK-03 مقفلان بقيم محسوبة من المحرك
+- يحتاج: رفع يدوي إلى GitHub + إضافة متغيرات Netlify البيئية
