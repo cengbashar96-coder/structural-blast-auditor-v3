@@ -1,0 +1,376 @@
+{
+  "bomb_database": {
+    "description": "قاعدة بيانات القنابل - Baseline Constants",
+    "bombs": [
+      {
+        "id": 1,
+        "type": "AN-M30A1",
+        "caliber": 100,
+        "weight_kg": 61,
+        "total_length_m": 1.38,
+        "body_length_m": 0.76,
+        "diameter_m": 0.21,
+        "ld_ratio": 3.6,
+        "lhd_ratio": 1,
+        "charge_kg": 23,
+        "explosive": "Tritonal"
+      },
+      {
+        "id": 2,
+        "type": "AN-M57A1",
+        "caliber": 250,
+        "weight_kg": 131,
+        "total_length_m": 1.58,
+        "body_length_m": 0.95,
+        "diameter_m": 0.28,
+        "ld_ratio": 3.4,
+        "lhd_ratio": 1,
+        "charge_kg": 62,
+        "explosive": "Tritonal"
+      },
+      {
+        "id": 3,
+        "type": "AN-M64A1",
+        "caliber": 500,
+        "weight_kg": 264,
+        "total_length_m": 1.83,
+        "body_length_m": 1.21,
+        "diameter_m": 0.36,
+        "ld_ratio": 3.3,
+        "lhd_ratio": 1,
+        "charge_kg": 128,
+        "explosive": "Tritonal"
+      },
+      {
+        "id": 4,
+        "type": "M117(M)",
+        "caliber": 750,
+        "weight_kg": 373,
+        "total_length_m": 2.27,
+        "body_length_m": 1.42,
+        "diameter_m": 0.41,
+        "ld_ratio": 3.5,
+        "lhd_ratio": 1,
+        "charge_kg": 177,
+        "explosive": "Tritonal"
+      },
+      {
+        "id": 5,
+        "type": "AN-M65A1",
+        "caliber": 1000,
+        "weight_kg": 547,
+        "total_length_m": 2.46,
+        "body_length_m": 1.37,
+        "diameter_m": 0.48,
+        "ld_ratio": 2.8,
+        "lhd_ratio": 1,
+        "charge_kg": 270,
+        "explosive": "Tritonal"
+      },
+      {
+        "id": 6,
+        "type": "AN-M66A1",
+        "caliber": 2000,
+        "weight_kg": 1033,
+        "total_length_m": 2.97,
+        "body_length_m": 1.82,
+        "diameter_m": 0.59,
+        "ld_ratio": 3.1,
+        "lhd_ratio": 1,
+        "charge_kg": 526,
+        "explosive": "Tritonal"
+      },
+      {
+        "id": 7,
+        "type": "3000kg",
+        "caliber": 3000,
+        "weight_kg": 1383,
+        "total_length_m": 4.7,
+        "body_length_m": 3.07,
+        "diameter_m": 0.61,
+        "ld_ratio": 5,
+        "lhd_ratio": 1,
+        "charge_kg": 816,
+        "explosive": "Tritonal"
+      },
+      {
+        "id": 8,
+        "type": "MK81",
+        "caliber": 250,
+        "weight_kg": 118,
+        "total_length_m": 1.88,
+        "body_length_m": 1.18,
+        "diameter_m": 0.23,
+        "ld_ratio": 5.2,
+        "lhd_ratio": 2.5,
+        "charge_kg": 45,
+        "explosive": "Tritonal"
+      },
+      {
+        "id": 9,
+        "type": "MK82",
+        "caliber": 500,
+        "weight_kg": 241,
+        "total_length_m": 2.21,
+        "body_length_m": 1.55,
+        "diameter_m": 0.27,
+        "ld_ratio": 5.7,
+        "lhd_ratio": 2.5,
+        "charge_kg": 87,
+        "explosive": "Tritonal"
+      },
+      {
+        "id": 10,
+        "type": "MK83",
+        "caliber": 1000,
+        "weight_kg": 441,
+        "total_length_m": 3.01,
+        "body_length_m": 1.92,
+        "diameter_m": 0.36,
+        "ld_ratio": 5.3,
+        "lhd_ratio": 2,
+        "charge_kg": 215,
+        "explosive": "Tritonal"
+      },
+      {
+        "id": 11,
+        "type": "MK84",
+        "caliber": 2000,
+        "weight_kg": 894,
+        "total_length_m": 3.83,
+        "body_length_m": 2.41,
+        "diameter_m": 0.46,
+        "ld_ratio": 5.2,
+        "lhd_ratio": 2,
+        "charge_kg": 430,
+        "explosive": "Tritonal"
+      },
+      {
+        "id": 12,
+        "type": "MK81_Snikay",
+        "caliber": 250,
+        "weight_kg": 134,
+        "total_length_m": 1.91,
+        "body_length_m": 1.19,
+        "diameter_m": 0.23,
+        "ld_ratio": 5.2,
+        "lhd_ratio": 2.5,
+        "charge_kg": 45,
+        "explosive": "Tritonal"
+      },
+      {
+        "id": 13,
+        "type": "MK82_Snikay",
+        "caliber": 500,
+        "weight_kg": 260,
+        "total_length_m": 2.26,
+        "body_length_m": 1.55,
+        "diameter_m": 0.27,
+        "ld_ratio": 5.7,
+        "lhd_ratio": 2.5,
+        "charge_kg": 87,
+        "explosive": "Tritonal"
+      },
+      {
+        "id": 14,
+        "type": "M117R",
+        "caliber": 750,
+        "weight_kg": 380,
+        "total_length_m": 2.21,
+        "body_length_m": 1.12,
+        "diameter_m": 0.11,
+        "ld_ratio": 3.5,
+        "lhd_ratio": 1,
+        "charge_kg": 177,
+        "explosive": "Tritonal"
+      }
+    ]
+  },
+  "explosive_coefficients": {
+    "description": "معاملات المواد المتفجرة",
+    "materials": [
+      {
+        "name": "Tritonal 80-20",
+        "K1": 1.639
+      },
+      {
+        "name": "Mixture V",
+        "K1": 1.34
+      },
+      {
+        "name": "Torpex H6",
+        "K1": 1.26
+      },
+      {
+        "name": "Tritonal 90/40",
+        "K1": 1.23
+      },
+      {
+        "name": "Ednaloud",
+        "K1": 1.05
+      }
+    ]
+  },
+  "soil_penetration_coefficients": {
+    "description": "معاملات اختراق التربة والخرسانة",
+    "materials": [
+      {
+        "name": "تربة طينية رطبة مشبعة بالماء",
+        "Kpr": 1.3e-05,
+        "Kv": 0.6,
+        "Kp": 0.85,
+        "Kot": null
+      },
+      {
+        "name": "طين متوسط الكثافة",
+        "Kpr": 7e-06,
+        "Kv": 0.5,
+        "Kp": 0.6,
+        "Kot": null
+      },
+      {
+        "name": "طين طبيعي مع حجارة",
+        "Kpr": 6e-06,
+        "Kv": 0.5,
+        "Kp": 0.6,
+        "Kot": null
+      },
+      {
+        "name": "رمل مع شوائب",
+        "Kpr": 5e-06,
+        "Kv": 0.5,
+        "Kp": 0.6,
+        "Kot": null
+      },
+      {
+        "name": "رمل نقي / حجر جيري",
+        "Kpr": 4.5e-06,
+        "Kv": 0.5,
+        "Kp": 0.63,
+        "Kot": null
+      },
+      {
+        "name": "بلاط/رصف حجري",
+        "Kpr": 3e-06,
+        "Kv": 0.25,
+        "Kp": 0.58,
+        "Kot": 0.88
+      },
+      {
+        "name": "بلاط مأسّد",
+        "Kpr": 2.5e-06,
+        "Kv": 0.25,
+        "Kp": 0.61,
+        "Kot": 0.81
+      },
+      {
+        "name": "جرانيت/نايس",
+        "Kpr": 7e-07,
+        "Kv": 0.2,
+        "Kp": 0.53,
+        "Kot": 0.75
+      },
+      {
+        "name": "صخر كلسي",
+        "Kpr": 1.5e-06,
+        "Kv": 0.25,
+        "Kp": 0.56,
+        "Kot": 0.79
+      },
+      {
+        "name": "خرسانة عادية 170",
+        "Kpr": 1.2e-06,
+        "Kv": 0.16,
+        "Kp": 0.36,
+        "Kot": 0.51
+      },
+      {
+        "name": "خرسانة عادية 225",
+        "Kpr": 1e-06,
+        "Kv": 0.16,
+        "Kp": 0.34,
+        "Kot": 0.48
+      },
+      {
+        "name": "خرسانة مسلحة 200",
+        "Kpr": 8e-07,
+        "Kv": 0.13,
+        "Kp": 0.32,
+        "Kot": 0.46
+      },
+      {
+        "name": "خرسانة مسلحة 250-300",
+        "Kpr": 7e-07,
+        "Kv": 0.13,
+        "Kp": 0.3,
+        "Kot": 0.44
+      }
+    ]
+  },
+  "soil_wave_parameters": {
+    "description": "معاملات الموجة في التربة",
+    "soils": [
+      {
+        "name": "رمل مفكوك",
+        "rho": "150-155",
+        "a0": "100-150",
+        "a0_a1": 2.5,
+        "xi": "0.4-0.5"
+      },
+      {
+        "name": "تربة رملية/جيرية",
+        "rho": "160-165",
+        "a0": "200-500",
+        "a0_a1": 2.5,
+        "xi": "0.35-0.4"
+      },
+      {
+        "name": "طين مع حجارة",
+        "rho": "180-185",
+        "a0": "400-600",
+        "a0_a1": 2,
+        "xi": "0.5-0.6"
+      },
+      {
+        "name": "طين متوسط",
+        "rho": "195-200",
+        "a0": "500-800",
+        "a0_a1": 1.5,
+        "xi": "0.5-0.7"
+      }
+    ]
+  },
+  "concrete_resistance": {
+    "description": "مقاومة الضغط للخرسانة",
+    "grades": {
+      "M200": 115,
+      "M300": 170,
+      "M350": 200,
+      "M400": 225,
+      "M500": 280,
+      "M600": 340,
+      "M700": 390,
+      "M800": 450
+    }
+  },
+  "steel_properties": {
+    "description": "خصائص حديد التسليح",
+    "grades": [
+      {
+        "grade": "A-I",
+        "tensile_strength": 2100,
+        "elasticity_modulus": 2100000
+      },
+      {
+        "grade": "A-II",
+        "tensile_strength": 3000,
+        "elasticity_modulus": 2100000
+      },
+      {
+        "grade": "A-III",
+        "tensile_strength": 4000,
+        "elasticity_modulus": 2100000
+      }
+    ]
+  }
+}

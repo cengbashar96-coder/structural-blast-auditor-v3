@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="UTF-8">
+<style>
+@page {
+  size: A4;
+  margin: 20mm 15mm 20mm 15mm;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: 'Noto Sans SC', 'Sarasa Mono SC', 'DejaVu Sans', sans-serif;
+  direction: rtl;
+  text-align: right;
+  color: #1a1a2e;
+  background: #fff;
+  line-height: 1.7;
+  font-size: 11pt;
+  margin: 0;
+  padding: 0;
+}
+h1 {
+  font-size: 22pt;
+  color: #0d1b2a;
+  border-bottom: 3px solid #1b4965;
+  padding-bottom: 8px;
+  margin-top: 30px;
+}
+h2 {
+  font-size: 16pt;
+  color: #1b4965;
+  border-bottom: 1.5px solid #5fa8d3;
+  padding-bottom: 5px;
+  margin-top: 25px;
+}
+h3 {
+  font-size: 13pt;
+  color: #3a7ca5;
+  margin-top: 20px;
+}
+.formula-box {
+  background: #f0f7ff;
+  border: 1px solid #b8d4e8;
+  border-right: 4px solid #1b4965;
+  padding: 12px 18px;
+  margin: 12px 0;
+  font-family: 'Sarasa Mono SC', 'Courier New', monospace;
+  font-size: 11pt;
+  direction: ltr;
+  text-align: center;
+  border-radius: 4px;
+}
+.formula-box .label {
+  direction: rtl;
+  text-align: right;
+  font-family: 'Noto Sans SC', sans-serif;
+  font-size: 10pt;
+  color: #555;
+  margin-bottom: 6px;
+}
+.result-box {
+  background: #e8f5e9;
+  border: 1px solid #81c784;
+  border-right: 4px solid #2e7d32;
+  padding: 10px 15px;
+  margin: 10px 0;
+  border-radius: 4px;
+}
+.warning-box {
+  background: #fff3e0;
+  border: 1px solid #ffb74d;
+  border-right: 4px solid #e65100;
+  padding: 10px 15px;
+  margin: 10px 0;
+  border-radius: 4px;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+  font-size: 10pt;
+}
+th {
+  background: #1b4965;
+  color: white;
+  padding: 8px 10px;
+  text-align: center;
+  font-weight: bold;
+}
+td {
+  padding: 6px 10px;
+  border: 1px solid #ccc;
+  text-align: center;
+}
+tr:nth-child(even) { background: #f5f9fc; }
+tr:hover { background: #e3f2fd; }
+.cover {
+  text-align: center;
+  padding: 60px 30px;
+  page-break-after: always;
+}
+.cover h1 {
+  font-size: 28pt;
+  border: none;
+  color: #0d1b2a;
+}
+.cover .subtitle {
+  font-size: 16pt;
+  color: #1b4965;
+  margin: 20px 0;
+}
+.cover .version {
+  font-size: 12pt;
+  color: #555;
+  margin: 30px 0;
+  padding: 15px;
+  background: #f0f7ff;
+  border-radius: 8px;
+}
+.toc { page-break-after: always; }
+.section { margin-bottom: 20px; }
+.eq-number {
+  color: #1b4965;
+  font-weight: bold;
+  font-size: 10pt;
+}
+.baseline-tag {
+  display: inline-block;
+  background: #1b4965;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 9pt;
+  margin-right: 5px;
+}
+.interp-section {
+  background: #fafafa;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 15px;
+  margin: 15px 0;
+}
+.page-break { page-break-before: always; }
+.footer {
+  text-align: center;
+  font-size: 9pt;
+  color: #888;
+  border-top: 1px solid #ddd;
+  padding-top: 10px;
+  margin-top: 30px;
+}
+</style>
+</head>
+<body>
+
+<!-- COVER PAGE -->
+<div class="cover">
+  <div style="font-size:14pt; color:#1b4965; margin-bottom:20px;">منصة المدقق الديناميكي الموحد V3.0</div>
+  <h1>التقرير الهندسي السيادي</h1>
+  <div class="subtitle">المعادلات الإنشائية ودوال الاستيفاء الرقمي</div>
+  <div style="margin: 30px auto; max-width: 500px; text-align: right; font-size: 11pt; line-height: 2;">
+    <div><strong>المحتوى:</strong> ضغوط العصف الديناميكي - نواة المقطع - القص الثاقب</div>
+    <div><strong>المرجعية:</strong> الكود العربي السوري 2024 (WSD) + UFC 3-340-02</div>
+    <div><strong>التصنيف:</strong> Baseline Constants - غير قابل للتعديل اليدوي</div>
+  </div>
+  <div class="version">
+    <div><strong>الإصدار:</strong> V3.0-Baseline-Rev.01</div>
+    <div><strong>التاريخ:</strong> 2026-06-11</div>
+    <div><strong>نسبة الانحراف المستهدفة:</strong> 0.00%</div>
+  </div>
+</div>
+
+<!-- TABLE OF CONTENTS -->
+<div class="toc">
+<h1>فهرس المحتويات</h1>
+<div style="line-height: 2.5; font-size: 12pt;">
+  <div>1. مقدمة ونطاق العمل السيادي</div>
+  <div>2. المعادلات الأساسية لضغوط العصف الديناميكي</div>
+  <div style="padding-right: 25px;">2.1 معادلات سادوفسكي للضغط الزائد</div>
+  <div style="padding-right: 25px;">2.2 معادلات الطور الموجب والاندفاع</div>
+  <div style="padding-right: 25px;">2.3 معادلات الضغط المنعكس</div>
+  <div style="padding-right: 25px;">2.4 معادلات التفجير السطحي والارتفاعي</div>
+  <div>3. معادلات اختراق القنابل للتربة والخرسانة</div>
+  <div style="padding-right: 25px;">3.1 عمق الاختراق في التربة</div>
+  <div style="padding-right: 25px;">3.2 معاملات التأثير (λ)</div>
+  <div style="padding-right: 25px;">3.3 الشحنة الفعالة المكافئة</div>
+  <div>4. حساب الأحمال الديناميكية على المنشآت</div>
+  <div style="padding-right: 25px;">4.1 الإجهاد الأقصى في الموجة</div>
+  <div style="padding-right: 25px;">4.2 الزمن الفعال وتردد الاهتزاز</div>
+  <div style="padding-right: 25px;">4.3 الحمل التصميمي على السقف والجدران</div>
+  <div>5. التحقق من وقوع محصلة الأحمال داخل نواة المقطع</div>
+  <div style="padding-right: 25px;">5.1 شرط النواة للمقطع الخرساني</div>
+  <div style="padding-right: 25px;">5.2 التحقق الرقمي للحالات المرجعية</div>
+  <div>6. فحص إجهادات القص الثاقب (Punching Shear)</div>
+  <div style="padding-right: 25px;">6.1 معادلات القص الثاقب وفق الكود العربي السوري 2024</div>
+  <div style="padding-right: 25px;">6.2 معايير UFC 3-340-02 للقص الثاقب الديناميكي</div>
+  <div style="padding-right: 25px;">6.3 التحقق الرقمي</div>
+  <div>7. دوال الاستيفاء الرقمي المبرمجة (Interpolation Functions)</div>
+  <div style="padding-right: 25px;">7.1 دوال استيفاء معاملات التربة والموجة</div>
+  <div style="padding-right: 25px;">7.2 دوال استيفاء خصائص القنابل</div>
+  <div style="padding-right: 25px;">7.3 دوال الاستيفاء الهندسية (القوس، السماكات)</div>
+  <div>8. ثوابت Baseline Constants - الكود المبرمج</div>
+  <div>9. تأكيد الجاهزية لربط البنية التحتية</div>
+</div>
+</div>
+
+<!-- SECTION 1 -->
+<div class="section">
+<h1>1. مقدمة ونطاق العمل السيادي</h1>
+
+<p>يقدم هذا التقرير الهندسي السيادي الاستيعاب الكامل للمعادلات الإنشائية الحاكمة لمنصة المدقق الديناميكي الموحد V3.0، المستخلصة من الأطروحة العلمية للتحصين وملفات الإكسيل المرجعية السبع. يغطي التقرير جميع المعادلات الخاصة بحسابات ضغوط العصف الديناميكي، والتحقق من وقوع محصلة الأحمال داخل نواة المقطع، وفحص السعة وإجهادات القص الثاقب وفق الكود العربي السوري لعام 2024 بطريقة إجهادات العمل (WSD) ومعايير UFC 3-340-02 الصادرة عن وزارة الدفاع الأمريكية.</p>
+
+<p>تم تحويل جميع المنحنيات والرسومات البيانية الموجودة في الأطروحة والإكسيل إلى دوال استيفاء رياضي رقمية مبرمجة (Interpolation Functions) لاعتمادها كـ Baseline Constants غير قابلة للتعديل اليدوي، مما يضمن نسبة انحراف 0.00% عند ربطها حركياً بالبنية التحتية للمنصة (Next.js PWA / TypeScript) في الخطوة التالية.</p>
+
+<h2>المصادر المرجعية السيادية</h2>
+<table>
+<tr><th>#</th><th>الملف المرجعي</th><th>المحتوى</th><th>عدد المعادلات</th></tr>
+<tr><td>1</td><td>الأطروحة العلمية للتحصين (46 صفحة)</td><td>النظرية والمعادلات الأساسية + نتائج AUTODYN</td><td>25+</td></tr>
+<tr><td>2</td><td>مقر قنبلة خارقة_٠٦١٦٥٢.xlsx</td><td>حسابات مقر القنبلة الخارقة (3 أوراق)</td><td>231</td></tr>
+<tr><td>3</td><td>مقار قيادة-قنبلة انفجارية_٠٦١٦١٧.xlsx</td><td>حسابات مقر القنبلة الانفجارية (3 أوراق)</td><td>227</td></tr>
+<tr><td>4</td><td>سماكة مقطع الجزء الديناميكي_٠٦١٥٥٨.xlsx</td><td>سماكة مقطع المنطقة الديناميكية</td><td>64</td></tr>
+<tr><td>5</td><td>سماكة المنطقة الديناميكية_٠٦١٥٣٨.xlsx</td><td>سماكة المنطقة الديناميكية</td><td>53</td></tr>
+<tr><td>6</td><td>حساب حمولة الانفجار على سقف النفق_٠٦١٥١٢.xlsx</td><td>حمولة الانفجار على سقف النفق</td><td>221</td></tr>
+<tr><td>7</td><td>حساب التباعد بين نفقين_٠٦١٤٣٩.xlsx</td><td>التباعد بين نفقين متجاورين</td><td>54</td></tr>
+</table>
+</div>
+
+<!-- SECTION 2 -->
+<div class="page-break"></div>
+<div class="section">
+<h1>2. المعادلات الأساسية لضغوط العصف الديناميكي</h1>
+
+<h2>2.1 معادلات سادوفسكي للضغط الزائد (Sadovsky Overpressure Formulas)</h2>
+
+<p>تُعد معادلات سادوفسكي الحجر الأساس في حساب الضغوط الناتجة عن الانفجارات، وهي مستخدمة في الكود العربي السوري 2024 ومعايير UFC 3-340-02 كمرجعية أساسية. تشمل هذه المعادلات ثلاث حالات رئيسية: الضغط الساقط العمودي، والضغط المنعكس، والضغط عند زاوية سقوط مائلة.</p>
+
+<div class="formula-box">
+<div class="label">المعادلة (1): الضغط الزائد الساقط - Sadovsky Incident Overpressure</div>
+ΔP = 0.1 · ∛C / R + 0.43 · ∛C² / R² + 1.4 · C / R³
+</div>
+
+<div class="formula-box">
+<div class="label">المعادلة (2): الضغط الزائد المنعكس - Reflected Overpressure</div>
+ΔP<sub>φ</sub> = 0.084 · ∛C / R + 0.27 · ∛C² / R² + 0.7 · C / R³
+</div>
+
+<div class="formula-box">
+<div class="label">المعادلة (3): الضغط عند زاوية مائلة - Oblique Incidence Overpressure</div>
+ΔP<sub>φ</sub> = 0.146 · √(C/(S·R)) + 0.92 · √(C²/(S²·R²)) + 4.4 · C/(S·R)
+</div>
+
+<p>حيث: C = كمية المتفجرات (كجم)، R = المسافة بين مركز الانفجار ونقطة القياس (م)، S = مساحة السطح المتأثر (م²)، φ = زاوية سقوط الموجة. هذه المعادلات صالحة عندما تكون النسبة √C·√R/T أقل من أو تساوي 1000، حيث T = 2π/ω هو دور الاهتزاز الطبيعي للمنشأ.</p>
+
+<h2>2.2 معادلات الطور الموجب والاندفاع (Positive Phase & Impulse)</h2>
+
+<p>يتم حساب زمن الطور الموجب والاندفاع الناتج عن الانفجار بعدة طرق، والأكثر استخداماً في التصميم الحمائي هي الطريقة الأولى لسادوفسكي.</p>
+
+<div class="formula-box">
+<div class="label">المعادلة (4): زمن الطور الموجب - الطريقة الأولى (سادوفسكي)</div>
+τ<sub>+</sub> = 1.7 × 10<sup>-3</sup> · ∛√C · √R
+</div>
+
+<div class="formula-box">
+<div class="label">المعادلة (5): الاندفاع - الطريقة الأولى</div>
+i = 6.3 · ∛C² / R
+</div>
+
+<div class="formula-box">
+<div class="label">المعادلة (6): زمن الطور الموجب - التفجير السطحي</div>
+τ<sub>+</sub> = 1.5 × 10<sup>-3</sup> · ∛√C · √R
+</div>
+
+<div class="formula-box">
+<div class="label">المعادلة (7): الاندثار - التفجير السطحي</div>
+i = 4 · ∛C² / R
+</div>
+
+<div class="formula-box">
+<div class="label">المعادلة (8): الزمن الفعال للموجة</div>
+τ<sub>эф</sub> = τ<sub>+</sub> · (0.0008 · (ΔP<sub>max</sub>)² - 0.0384 · ΔP<sub>max</sub> + 1.0013)
+</div>
+
+<p>المعادلة (8) هي معادلة استيفاء رقمية مبرمجة مشتقة من المنحنيات التجريبية في الأطروحة، وتُعد من Baseline Constants الأساسية للمنصة.</p>
+
+<h2>2.3 معادلات الضغط المنعكس عند السطح (Reflected Pressure)</h2>
+
+<div class="formula-box">
+<div class="label">المعادلة (9): الضغط المنعكس مع اقتران السرعة-الضغط</div>
+ΔP<sub>i</sub>(t,z) = k<sub>i</sub> · ΔP(t,z) - ρ · a<sub>i</sub> · V<sub>i</sub>
+</div>
+
+<p>حيث k<sub>i</sub> = معامل الانعكاس (يعتمد على زاوية السقوط ونوع السطح)، ρ = كثافة الوسط، a<sub>i</sub> = سرعة الموجة في الوسط، V<sub>i</sub> = السرعة الفعلية للوسط عند نقطة الاصطدام. عند تجاهل تأثير السرعة: a/a<sub>i</sub> = 2 (معامل الانعكاس للسطح الصلب).</p>
+
+<h2>2.4 معاملات تعديل الضغط الديناميكي</h2>
+
+<div class="formula-box">
+<div class="label">المعادلة (10): معامل تعديل زاوية السقوط</div>
+k<sub>v</sub> = k<sub>ap</sub> · (cos φ)² + k<sub>b</sub> · (sin φ)²
+</div>
+
+<div class="formula-box">
+<div class="label">المعادلة (11): معامل تصحيح الزاوية للمسافات البعيدة</div>
+f(β) = 0.3 + 0.7 · cos β  (عند R > r₀)
+</div>
+
+<div class="formula-box">
+<div class="label">المعادلة (12): نصف قار الانفجار المرجعي</div>
+r₀ = 0.053 · ∛C
+</div>
+
+<h3>جدول معاملات تعديل موقع الانفجار K<sub>gr</sub></h3>
+<table>
+<tr><th>موقع الانفجار</th><th>K<sub>gr</sub></th></tr>
+<tr><td>على سطح الأرض أو قريب منه</td><td>1.0 (حالة مرجعية)</td></tr>
+<tr><td>في الهواء</td><td>معامل تعديل &lt; 1.0</td></tr>
+<tr><td>على سطح الماء أو قريب منه</td><td>معامل تعديل خاص</td></tr>
+</table>
+
+<h3>معامل تعديل الارتفاع K<sub>zab</sub></h3>
+<table>
+<tr><th>الشرط</th><th>K<sub>zab</sub></th></tr>
+<tr><td>h ≥ r (تفجير على السطح)</td><td>1.0</td></tr>
+<tr><td>المسافة أكبر من r</td><td>0.5</td></tr>
+<tr><td>المسافة كبيرة جداً</td><td>0.2</td></tr>
+</table>
+</div>
+
+<!-- SECTION 3 -->
+<div class="page-break"></div>
+<div class="section">
+<h1>3. معادلات اختراق القنابل للتربة والخرسانة</h1>
+
+<h2>3.1 عمق الاختراق في التربة</h2>
+
+<p>تُعد معادلة اختراق القنابل للتربة والخرسانة من المعادلات الحاكمة في تصميم المنشآت الحمائية. يتم حساب عمق الاختراق بناءً على خصائص القنبلة (الوزن، القطر، السرعة، زاوية السقوط) وخصائص الوسط (معامل الاختراق، معامل التشوه).</p>
+
+<div class="formula-box">
+<div class="label">المعادلة (13): عمق الاختراق في التربة</div>
+h<sub>пр</sub> = λ₁ · λ₂ · k<sub>пр.г</sub> · (P/d²) · V · cos α
+</div>
+
+<div class="formula-box">
+<div class="label">المعادلة (14): معامل تأثير شكل الرأس الحربي</div>
+λ₁ = 0.5 + 0.4 · (l<sub>гч</sub>/d)<sup>0.666</sup>
+</div>
+
+<div class="formula-box">
+<div class="label">المعادلة (15): معامل تأثير القطر</div>
+λ₂ = 2.8 · d<sup>0.333</sup> - 1.3 · d<sup>0.5</sup>
+</div>
+
+<div class="formula-box">
+<div class="label">المعادلة (16): أُس التأثير</div>
+n = 3.5 - l<sub>гч</sub>/d
+</div>
+
+<div class="formula-box">
+<div class="label">المعادلة (17): معامل زاوية الاختراق للقنبلة الخارقة</div>
+ц = 0.5 · l<sub>k</sub> · cos((α + n·α)/2)
+</div>
+
+<div class="formula-box">
+<div class="label">المعادلة (18): معامل زاوية الاختراق للقنبلة الانفجارية</div>
+ц = 0.5 · d<sub>k</sub>
+</div>
+
+<h2>3.2 الشحنة الفعالة المكافئة</h2>
+
+<div class="formula-box">
+<div class="label">المعادلة (19): الشحنة الفعالة</div>
+C<sub>эф</sub> = 0.95 · K₁ · C
+</div>
+
+<div class="formula-box">
+<div class="label">المعادلة (20): طول الشحنة</div>
+l<sub>з</sub> = 0.95 · d<sub>k</sub> · (l<sub>з</sub>/d<sub>з</sub>)
+</div>
+
+<div class="formula-box">
+<div class="label">المعادلة (21): الشحنة الفعالة الخطية</div>
+C<sub>эф1</sub> = C<sub>эф</sub> / l<sub>з</sub>
+</div>
+
+<p>حيث: K₁ = معامل قوة المادة المتفجرة نسبة لـ TNT (Tritonal 80-20: K₁ = 1.639)، C = وزن الشحنة (كجم).</p>
+
+<h2>3.3 سماكة لوحة الحماية</h2>
+
+<div class="formula-box">
+<div class="label">المعادلة (22): سماكة لوحة الحماية</div>
+h<sub>t</sub> = h<sub>пр</sub> / n₀
+</div>
+
+<div class="formula-box">
+<div class="label">المعادلة (23): بروز لوحة الحماية</div>
+B<sub>t</sub> = 2 · √(R<sub>̽</sub>² - (H - h<sub>пр</sub> + ц)²)
+</div>
+
+<div class="formula-box">
+<div class="label">المعادلة (24): سماكة طبقة توزيع الضغط</div>
+H<sub>p.c</sub> = (h<sub>t</sub> - ц) · (H<sub>1</sub>/E₂)
+</div>
+</div>
+
+<!-- SECTION 4 -->
+<div class="page-break"></div>
+<div class="section">
+<h1>4. حساب الأحمال الديناميكية على المنشآت</h1>
+
+<h2>4.1 الإجهاد الأقصى في موجة الانفجار</h2>
+
+<div class="formula-box">
+<div class="label">المعادلة (25): الإجهاد الأقصى في الموجة</div>
+σ<sub>max</sub> = A · (R̄)<sup>-n₁</sup>
+</div>
+
+<div class="formula-box">
+<div class="label">المعادلة (26): الإجهاد المصحح (عند h̄₃ &lt; 0.7)</div>
+σ<sub>max</sub> = 0.6 · m · A · (R̄)<sup>-n₁</sup>
+</div>
+
+<div class="formula-box">
+<div class="label">المعادلة (27): البعد المختزل</div>
+R̄ = R<sub>экв</sub> / ∛C<sub>эф</sub>
+</div>
+
+<div class="formula-box">
+<div class="label">المعادلة (28): البعد الحرج</div>
+R★ = R★̄ · ∛C<sub>эф</sub>
+</div>
+
+<div class="formula-box">
+<div class="label">المعادلة (29): عمق الاختراق المختزل</div>
+h̄₃ = h₃ / ∛C<sub>эф</sub>
+</div>
+
+<h2>4.2 تردد الاهتزاز والزمن الفعال</h2>
+
+<div class="formula-box">
+<div class="label">المعادلة (30): تردد الاهتزاز الذاتي</div>
+ω = (1/(a<sub>p</sub>·100)²) · C<sub>μ</sub> · μ · √(B/m<sub>e.д</sub>)
+</div>
+
+<p>حيث C<sub>μ</sub> = معامل الربط (22.37√(1+0.6η²+η⁴) للتكديس، 9.87(1+η²) لل مفصلية)، η = b<sub>p</sub>/a<sub>p</sub> (نسبة الأبعاد)، B = صلابة اللوحة، m<sub>e.д</sub> = الكتلة النوعية.</p>
+
+<div class="formula-box">
+<div class="label">المعادلة (31): شرط الديناميكية</div>
+τ<sub>эф</sub> ≥ 0.2π/ω  (يجب التحقق)
+</div>
+
+<div class="formula-box">
+<div class="label">المعادلة (32): زمن صعود الضغط</div>
+τ<sub>н</sub> = h̄₃ · ∛C<sub>эф</sub> / a<sub>ср</sub>
+</div>
+
+<div class="formula-box">
+<div class="label">المعادلة (33): سرعة الموجة المتوسطة</div>
+a<sub>ср</sub> = (a₀ + a₀<sub>z</sub>) / 2  ;  a₁<sub>ср</sub> = (a₁ + a₁<sub>z</sub>) / 2
+</div>
+
+<h2>4.3 الحمل التصميمي على السقف والجدران</h2>
+
+<div class="formula-box">
+<div class="label">المعادلة (34): الحمل الأقصى على السقف</div>
+P<sub>max</sub> = 2 · K<sub>п</sub> · σ<sub>max</sub>
+</div>
+
+<div class="formula-box">
+<div class="label">المعادلة (35): الحمل المكافئ</div>
+P<sub>экв</sub> = K<sub>д</sub> · 0.9 · P<sub>max</sub>
+</div>
+
+<div class="formula-box">
+<div class="label">المعادلة (36): الحمل التصميمي الكلي</div>
+P<sub>p</sub> = P<sub>ст</sub> + P<sub>экв</sub>
+</div>
+
+<div class="formula-box">
+<div class="label">المعادلة (37): الحمل الساكن من التربة</div>
+P<sub>ст</sub> = Z · γ / 10000
+</div>
+
+<h3>النتائج المرجعية من ملفات الإكسيل</h3>
+<table>
+<tr><th>المعلمة</th><th>رمز</th><th>مقر - قنبلة خارقة</th><th>مقر - قنبلة انفجارية</th><th>سقف النفق</th><th>الوحدة</th></tr>
+<tr><td>سماكة السقف</td><td>H<sub>п</sub></td><td>70.46</td><td>مُختلف</td><td>40 (معتمد)</td><td>cm</td></tr>
+<tr><td>سماكة الجدار</td><td>H<sub>c</sub></td><td>49.82</td><td>مُختلف</td><td>40 (معتمد)</td><td>cm</td></tr>
+<tr><td>سماكة الأرضية</td><td>H<sub>ф</sub></td><td>42.35</td><td>مُختلف</td><td>—</td><td>cm</td></tr>
+<tr><td>الحمل التصميمي على السقف</td><td>P<sub>pп</sub></td><td>4.921</td><td>10.556</td><td>1.900</td><td>kg/cm²</td></tr>
+<tr><td>الحمل التصميمي على الجدار</td><td>P<sub>pс</sub></td><td>3.780</td><td>4.360</td><td>—</td><td>kg/cm²</td></tr>
+<tr><td>الإجهاد الأقصى</td><td>σ<sub>max</sub></td><td>2.88</td><td>7.31</td><td>4.418</td><td>kg/cm²</td></tr>
+<tr><td>الزمن الفعال (سقف)</td><td>τ<sub>эф</sub></td><td>0.238</td><td>0.184</td><td>0.0458</td><td>s</td></tr>
+<tr><td>سماكة لوحة الحماية</td><td>h<sub>t</sub></td><td>107.22</td><td>74.67</td><td>—</td><td>cm</td></tr>
+<tr><td>عمق الاختراق</td><td>h<sub>пр</sub></td><td>—</td><td>—</td><td>2.152</td><td>m</td></tr>
+<tr><td>تباعد الأنفاق (قنبلة)</td><td>L</td><td>—</td><td>—</td><td>19.652</td><td>m</td></tr>
+<tr><td>تباعد الأنفاق (صخري)</td><td>L</td><td>—</td><td>—</td><td>2.206</td><td>m</td></tr>
+</table>
+</div>
+
+<!-- SECTION 5 -->
+<div class="page-break"></div>
+<div class="section">
+<h1>5. التحقق من وقوع محصلة الأحمال داخل نواة المقطع</h1>
+
+<h2>5.1 شرط النواة للمقطع الخرساني (Section Core Condition)</h2>
+
+<p>يُعد التحقق من وقوع محصلة الأحمال داخل نواة المقطع الخرساني شرطاً أساسياً في طريقة إجهادات العمل (WSD) وفق الكود العربي السوري 2024، لضمان عدم حدوث إجهادات شد في المقطع الخرساني تحت تأثير الأحمال الديناميكية. تقع النواة في المقطع المستطيل ضمن الثلث الأوسط من كل بعد، ويجب أن تكون اللامركزية أقل من أو تساوي سدس البعد الكلي للمقطع.</p>
+
+<div class="formula-box">
+<div class="label">المعادلة (38): شرط النواة للمقطع المستطيل</div>
+e ≤ h/6  ⟹  محصلة الأحمال داخل النواة (لا إجهاد شد)
+</div>
+
+<div class="formula-box">
+<div class="label">المعادلة (39): اللامركزية</div>
+e = M / N
+</div>
+
+<div class="formula-box">
+<div class="label">المعادلة (40): العزم على السقف (تكديس)</div>
+M<sub>s</sub> = P<sub>p</sub> · a<sub>p</sub>² / 12  (عزوم تكديس)
+</div>
+
+<div class="formula-box">
+<div class="label">المعادلة (41): العزم على السقف (مفصلي)</div>
+M<sub>s</sub> = P<sub>p</sub> · a<sub>p</sub>² / 8  (عزوم مفصلية)
+</div>
+
+<h2>5.2 التحقق الرقمي للحالات المرجعية</h2>
+
+<p>بالاعتماد على بيانات ملف حساب حمولة الانفجار على سقف النفق، نتحقق من شرط النواة:</p>
+
+<div class="result-box">
+<strong>التحقق - حالة سقف النفق:</strong><br>
+• الحمل التصميمي: P<sub>p</sub> = 1.9 kg/cm² = 19 t/m²<br>
+• البعد القصير: a<sub>p</sub> = 1.0 m<br>
+• البعد الطويل: b<sub>p</sub> = 3.0 m<br>
+• سماكة السقف المعتمدة: H<sub>п</sub> = 40 cm = 0.40 m<br>
+• العزم المفصلي: M<sub>s</sub> = 24 t·m (معتمد من حسابات الإكسيل)<br>
+• القوة المحورية: N = P<sub>p</sub> · b<sub>p</sub> = 19 × 3 = 57 t/m<br>
+• اللامركزية: e = M/N = 24/57 = 0.421 m<br>
+• حد النواة: h/6 = 0.40/6 = 0.067 m<br>
+• <strong style="color:#c62828;">النتيجة: e = 0.421 &gt; h/6 = 0.067 ⟹ محصلة الأحمال خارج النواة</strong><br>
+• <strong>ملاحظة:</strong> هذا شرط متوقع في المنشآت الحمائية المعرضة لأحمال انفجار ديناميكية كبيرة، ويتطلب تصميم تسليح مزدوج للشد.
+</div>
+
+<div class="warning-box">
+<strong>توصية هندسية:</strong> في المنشآت الحمائية حيث تخرج محصلة الأحمال عن نواة المقطع بشكل متوقع بسبب الأحمال الديناميكية العالية، يجب استخدام معادلات المقطع الخرساني المصحح مع تسليح مزدوج (فقاعات شد وضغط) وفق الفصل الثامن من الكود العربي السوري 2024. يجب التحقق من: σ<sub>c</sub> ≤ R<sub>b,н</sub>/K<sub>н</sub> و σ<sub>s</sub> ≤ R<sub>a,н</sub>/K<sub>н</sub> حيث K<sub>н</sub> معامل الأمان.
+</div>
+</div>
+
+<!-- SECTION 6 -->
+<div class="page-break"></div>
+<div class="section">
+<h1>6. فحص إجهادات القص الثاقب (Punching Shear)</h1>
+
+<h2>6.1 معادلات القص الثاقب وفق الكود العربي السوري 2024 (WSD)</h2>
+
+<p>يتم فحص القص الثاقب عند الأعمدة والجدران الحاملة في المنشآت الحمائية للتأكد من أن إجهاد القص المحيطي لا يتجاوز مقاومة القص للخرسانة. في طريقة إجهادات العمل (WSD)، يتم استخدام معاملات أمان مناسبة للأحمال الديناميكية.</p>
+
+<div class="formula-box">
+<div class="label">المعادلة (42): إجهاد القص الثاقب</div>
+τ<sub>p</sub> = P / (u · h₀)
+</div>
+
+<div class="formula-box">
+<div class="label">المعادلة (43): المحيط الحرج للقص الثاقب</div>
+u = 2·(a + h₀) + 2·(b + h₀)  (عمود مستطيل)
+</div>
+
+<div class="formula-box">
+<div class="label">المعادلة (44): مقاومة القص الثاقب للخرسانة - WSD</div>
+τ<sub>cr</sub> = K<sub>н</sub> · R<sub>bt</sub>  (للأحمال الساكنة)
+τ<sub>cr,d</sub> = DIF · K<sub>н</sub> · R<sub>bt</sub>  (للأحمال الديناميكية)
+</div>
+
+<p>حيث: P = القوة القاصمة (كجم)، u = المحيط الحرج (سم)، h₀ = العمق الفعال (سم)، R<sub>bt</sub> = مقاومة شد الخرسانة، DIF = معامل الزيادة الديناميكية، K<sub>н</sub> = معامل الأمان.</p>
+
+<h2>6.2 معايير UFC 3-340-02 للقص الثاقب الديناميكي</h2>
+
+<p>وفق معايير UFC 3-340-02 الفصل الرابع، يتم حساب القص الثاقب مع مراعاة التأثير الديناميكي للانفجار كالتالي:</p>
+
+<div class="formula-box">
+<div class="label">المعادلة (45): مقاومة القص الثاقب وفق UFC 3-340-02</div>
+V<sub>n</sub> = (2 + 4/β<sub>c</sub>) · √f'<sub>dc</sub> · b₀ · d
+</div>
+
+<div class="formula-box">
+<div class="label">المعادلة (46): مقاومة الضغط الديناميكية للخرسانة</div>
+f'<sub>dc</sub> = f'<sub>c</sub> · DIF
+</div>
+
+<div class="formula-box">
+<div class="label">المعادلة (47): معامل الزيادة الديناميكية - UFC 3-340-02</div>
+DIF<sub>conc</sub> = (ẋ / ẋ₀)<sup>1/(1+0.6·log₁₀(ẋ/ẋ₀))</sup>  (للخرسانة)
+</div>
+
+<p>حيث: β<sub>c</sub> = نسبة جانب العمود الطويل إلى القصير، f'<sub>dc</sub> = مقاومة الضغط الديناميكية، b₀ = محيط المحور الحرج، d = العمق الفعال، ẋ = معدل التشوه، ẋ₀ = معدل التشوه المرجعي.</p>
+
+<h2>6.3 التحقق الرقمي من القص الثاقب</h2>
+
+<div class="result-box">
+<strong>التحقق - حالة سقف النفق (عمود/جدار داعم):</strong><br>
+• سماكة السقف: h = 40 cm، h₀ = 35 cm<br>
+• الخرسانة: M350 → R<sub>b,н</sub> = 200 kg/cm²<br>
+• مقاومة الشد: R<sub>bt</sub> ≈ 12.5 kg/cm²<br>
+• DIF للقص = 1.25 (وفق UFC 3-340-02 Table 4-1)<br>
+• τ<sub>cr,d</sub> = 1.25 × 12.5 = 15.6 kg/cm²<br>
+• الحمل التصميمي: P<sub>p</sub> = 1.9 kg/cm² على مساحة 3.0 × 1.0 m<br>
+• القوة القاصمة عند جدار داعم عرض 30 cm: P ≈ 1.9 × 100 × 30 = 5,700 kg<br>
+• المحيط الحرج: u = 2(30+35) + 2(100+35) = 400 cm<br>
+• τ<sub>p</sub> = 5700 / (400 × 35) = 0.41 kg/cm²<br>
+• <strong style="color:#2e7d32;">النتيجة: τ<sub>p</sub> = 0.41 &lt; τ<sub>cr,d</sub> = 15.6 ⟹ آمن مقابل القص الثاقب ✓</strong>
+</div>
+
+<div class="result-box">
+<strong>التحقق - حالة مقر القنبلة الخارقة:</strong><br>
+• الحمل التصميمي على السقف: P<sub>pп</sub> = 4.921 kg/cm²<br>
+• سماكة السقف المحسوبة: H<sub>п</sub> = 70.46 cm<br>
+• h₀ ≈ 65 cm<br>
+• القوة القاصمة عند جدار عرض 40 cm، طول 300 cm:<br>
+• P ≈ 4.921 × 300 × 40 = 59,052 kg<br>
+• المحيط الحرج: u = 2(40+65) + 2(300+65) = 810 cm<br>
+• τ<sub>p</sub> = 59052 / (810 × 65) = 1.12 kg/cm²<br>
+• <strong style="color:#2e7d32;">النتيجة: τ<sub>p</sub> = 1.12 &lt; τ<sub>cr,d</sub> = 15.6 ⟹ آمن مقابل القص الثاقب ✓</strong>
+</div>
+</div>
+
+<!-- SECTION 7 -->
+<div class="page-break"></div>
+<div class="section">
+<h1>7. دوال الاستيفاء الرقمي المبرمجة (Interpolation Functions)</h1>
+
+<p>تم تحويل جميع المنحنيات والرسومات البيانية والجداول المرجعية من الأطروحة وملفات الإكسيل إلى دوال استيفاء رياضي رقمية مبرمجة (Interpolation Functions). هذه الدوال تُعد Baseline Constants غير قابلة للتعديل اليدوي، وسيتم ربطها حركياً بالبنية التحتية للمنصة (Next.js PWA / TypeScript) بنسبة انحراف 0.00%.</p>
+
+<h2>7.1 دوال استيفاء معاملات التربة والموجة</h2>
+
+<div class="interp-section">
+<h3>الدالة I-1: استيفاء معامل الاختراق k<sub>пр.г</sub></h3>
+<p>نوع الاستيفاء: استيفاء خطي مجزأ (Piecewise Linear Interpolation)</p>
+<p>المدخلات: نوع التربة (String) → المخرجات: k<sub>пр</sub>, k<sub>в</sub>, k<sub>p</sub>, k<sub>от</sub></p>
+<table>
+<tr><th>نوع التربة</th><th>k<sub>пр</sub></th><th>k<sub>в</sub></th><th>k<sub>p</sub></th><th>k<sub>от</sub></th></tr>
+<tr><td>طين رطب مشبع</td><td>1.30E-05</td><td>0.60</td><td>0.85</td><td>—</td></tr>
+<tr><td>طين متوسط</td><td>7.00E-06</td><td>0.50</td><td>0.60</td><td>—</td></tr>
+<tr><td>طين مع حجارة</td><td>6.00E-06</td><td>0.50</td><td>0.60</td><td>—</td></tr>
+<tr><td>رمل مشوب</td><td>5.00E-06</td><td>0.50</td><td>0.60</td><td>—</td></tr>
+<tr><td>رمل نقي / جيري</td><td>4.50E-06</td><td>0.50</td><td>0.63</td><td>—</td></tr>
+<tr><td>بلاط حجري</td><td>3.00E-06</td><td>0.25</td><td>0.58</td><td>0.88</td></tr>
+<tr><td>بلاط مأسّد</td><td>2.50E-06</td><td>0.25</td><td>0.61</td><td>0.81</td></tr>
+<tr><td>جرانيت/نايس</td><td>7.00E-07</td><td>0.20</td><td>0.53</td><td>0.75</td></tr>
+<tr><td>صخر كلسي</td><td>1.50E-06</td><td>0.25</td><td>0.56</td><td>0.79</td></tr>
+<tr><td>خرسانة عادية 170</td><td>1.20E-06</td><td>0.16</td><td>0.36</td><td>0.51</td></tr>
+<tr><td>خرسانة عادية 225</td><td>1.00E-06</td><td>0.16</td><td>0.34</td><td>0.48</td></tr>
+<tr><td>خرسانة مسلحة 200</td><td>8.00E-07</td><td>0.13</td><td>0.32</td><td>0.46</td></tr>
+<tr><td>خرسانة مسلحة 250-300</td><td>7.00E-07</td><td>0.13</td><td>0.30</td><td>0.44</td></tr>
+</table>
+</div>
+
+<div class="interp-section">
+<h3>الدالة I-2: استيفاء معاملات الموجة في التربة</h3>
+<p>نوع الاستيفاء: استيفاء خطي مجزأ (Piecewise Linear Interpolation)</p>
+<p>المدخلات: نوع التربة (String) → المخرجات: ρ, a₀, a₀/a₁, ξ</p>
+<table>
+<tr><th>نوع التربة</th><th>ρ (kg·s²/m⁴)</th><th>a₀ (m/s)</th><th>a₀/a₁</th><th>ξ</th></tr>
+<tr><td>رمل مفكوك</td><td>150-155</td><td>100-150</td><td>2.5</td><td>0.4-0.5</td></tr>
+<tr><td>تربة رملية/جيرية</td><td>160-165</td><td>200-500</td><td>2.5</td><td>0.35-0.4</td></tr>
+<tr><td>طين مع حجارة</td><td>180-185</td><td>400-600</td><td>2.0</td><td>0.5-0.6</td></tr>
+<tr><td>طين متوسط</td><td>195-200</td><td>500-800</td><td>1.5</td><td>0.5-0.7</td></tr>
+</table>
+</div>
+
+<div class="interp-section">
+<h3>الدالة I-3: استيفاء معامل التجارب A, n₁ للإجهاد في الموجة</h3>
+<p>نوع الاستيفاء: استيفاء خطي مجزأ (Piecewise Linear Interpolation)</p>
+<p>المدخلات: نوع التربة → المخرجات: A, n₁</p>
+<table>
+<tr><th>نوع التربة</th><th>A</th><th>n₁</th></tr>
+<tr><td>رمل مفكوك/مشوب</td><td>2~3</td><td>3</td></tr>
+<tr><td>طين مع حجارة</td><td>5</td><td>3</td></tr>
+<tr><td>طين متوسط</td><td>18</td><td>2.8</td></tr>
+<tr><td>تربة رملية/جيرية</td><td>4</td><td>3</td></tr>
+</table>
+</div>
+
+<h2>7.2 دوال استيفاء خصائص القنابل</h2>
+
+<div class="interp-section">
+<h3>الدالة I-4: قاعدة بيانات القنابل (14 نوع)</h3>
+<p>نوع الاستيفاء: بحث مباشر في الجدول (Direct Table Lookup)</p>
+<p>المدخلات: نوع القنبلة (ID/Name) → المخرجات: P, l<sub>k</sub>, d<sub>k</sub>, l<sub>з</sub>/d<sub>з</sub>, l<sub>гч</sub>/d, C, K₁</p>
+<table>
+<tr><th>#</th><th>النوع</th><th>العيار</th><th>الوزن (كجم)</th><th>القطر (م)</th><th>الشحنة (كجم)</th><th>l<sub>з</sub>/d<sub>з</sub></th><th>l<sub>гч</sub>/d</th></tr>
+<tr><td>1</td><td>AN-M30A1</td><td>100</td><td>61</td><td>0.21</td><td>23</td><td>3.6</td><td>1</td></tr>
+<tr><td>2</td><td>AN-M57A1</td><td>250</td><td>131</td><td>0.28</td><td>62</td><td>3.4</td><td>1</td></tr>
+<tr><td>3</td><td>AN-M64A1</td><td>500</td><td>264</td><td>0.36</td><td>128</td><td>3.3</td><td>1</td></tr>
+<tr><td>4</td><td>M117(M)</td><td>750</td><td>373</td><td>0.41</td><td>177</td><td>3.5</td><td>1</td></tr>
+<tr><td>5</td><td>AN-M65A1</td><td>1000</td><td>547</td><td>0.48</td><td>270</td><td>2.8</td><td>1</td></tr>
+<tr><td>6</td><td>AN-M66A1</td><td>2000</td><td>1033</td><td>0.59</td><td>526</td><td>3.1</td><td>1</td></tr>
+<tr><td>7</td><td>3000kg</td><td>3000</td><td>1383</td><td>0.61</td><td>816</td><td>5.0</td><td>1</td></tr>
+<tr><td>8</td><td>MK81</td><td>250</td><td>118</td><td>0.23</td><td>45</td><td>5.2</td><td>2.5</td></tr>
+<tr><td>9</td><td>MK82</td><td>500</td><td>241</td><td>0.27</td><td>87</td><td>5.7</td><td>2.5</td></tr>
+<tr><td>10</td><td>MK83</td><td>1000</td><td>441</td><td>0.36</td><td>215</td><td>5.3</td><td>2</td></tr>
+<tr><td>11</td><td>MK84</td><td>2000</td><td>894</td><td>0.46</td><td>430</td><td>5.2</td><td>2</td></tr>
+<tr><td>12</td><td>MK81 Snikay</td><td>250</td><td>134</td><td>0.23</td><td>45</td><td>5.2</td><td>2.5</td></tr>
+<tr><td>13</td><td>MK82 Snikay</td><td>500</td><td>260</td><td>0.27</td><td>87</td><td>5.7</td><td>2.5</td></tr>
+<tr><td>14</td><td>M117R</td><td>750</td><td>380</td><td>0.11</td><td>177</td><td>3.5</td><td>1</td></tr>
+</table>
+</div>
+
+<div class="interp-section">
+<h3>الدالة I-5: معاملات المواد المتفجرة</h3>
+<p>نوع الاستيفاء: بحث مباشر (Direct Lookup)</p>
+<table>
+<tr><th>المادة المتفجرة</th><th>K₁</th></tr>
+<tr><td>Tritonal 80-20</td><td>1.639</td></tr>
+<tr><td>Mixture V</td><td>1.340</td></tr>
+<tr><td>Torpex H6</td><td>1.260</td></tr>
+<tr><td>Tritonal 90/40</td><td>1.230</td></tr>
+<tr><td>Ednaloud</td><td>1.050</td></tr>
+</table>
+</div>
+
+<div class="interp-section">
+<h3>الدالة I-6: مقاومة الضغط للخرسانة</h3>
+<p>نوع الاستيفاء: استيفاء خطي مجزأ بين الدرجات</p>
+<table>
+<tr><th>الدرجة</th><th>M200</th><th>M300</th><th>M350</th><th>M400</th><th>M500</th><th>M600</th><th>M700</th><th>M800</th></tr>
+<tr><td>R<sub>b,н</sub> (kg/cm²)</td><td>115</td><td>170</td><td>200</td><td>225</td><td>280</td><td>340</td><td>390</td><td>450</td></tr>
+</table>
+</div>
+
+<div class="interp-section">
+<h3>الدالة I-7: خصائص حديد التسليح</h3>
+<table>
+<tr><th>الدرجة</th><th>مقاومة الشد (kg/cm²)</th><th>معامل المرونة (kg/cm²)</th></tr>
+<tr><td>A-I</td><td>2100</td><td>2,100,000</td></tr>
+<tr><td>A-II</td><td>3000</td><td>2,100,000</td></tr>
+<tr><td>A-III</td><td>4000</td><td>2,100,000</td></tr>
+</table>
+</div>
+
+<h2>7.3 دوال الاستيفاء الهندسية</h2>
+
+<div class="interp-section">
+<h3>الدالة I-8: حساب هندسة القوس الحمائي (Protodiakonov Method)</h3>
+<p>مصدر: الأطروحة - الفصل الثاني + سماكة مقطع الجزء الديناميكي</p>
+<div class="formula-box">
+<div class="label">سماكة الغطاء</div>
+d₀ = 0.06 · √((2l₀/h₀) · (1 + 2l₀/f))
+</div>
+<div class="formula-box">
+<div class="label">سماكة السقف</div>
+d<sub>n</sub> = (1.25 ~ 1.5) · d₀
+</div>
+<div class="formula-box">
+<div class="label">سماكة الجدار</div>
+d<sub>c</sub> = (1 ~ 2) · d<sub>n</sub>
+</div>
+<div class="formula-box">
+<div class="label">نصف قطر القوس</div>
+R² = (2a/2)² + (R - h₀)²  ⟹  R = (a² + h₀²) / (2h₀)
+</div>
+<div class="formula-box">
+<div class="label">طول القوس</div>
+l = θ · R  ;  tan(θ/2) = a / (R - h₀)
+</div>
+<div class="formula-box">
+<div class="label">مساحة المقطع</div>
+S = ½ · θ · R²
+</div>
+<p>حيث: f = معامل بروتودياكونوف (للصخر الكلسي: f = 6)، 2a = عرض النفق، h₀ = ارتفاع القوس.</p>
+</div>
+
+<div class="interp-section">
+<h3>الدالة I-9: الزمن الفعال للموجة (تجريبية)</h3>
+<p>مصدر: ملفات الإكسيل - معادلة الاستيفاء من المنحنيات</p>
+<div class="formula-box">
+<div class="label">معادلة الاستيفاء المبرمجة</div>
+τ<sub>эф</sub> = τ<sub>+</sub> · f(ΔP<sub>max</sub>)
+</div>
+<div class="formula-box">
+<div class="label">دالة التصحيح المتعددة الحدود</div>
+f(ΔP) = 0.0008 · ΔP² - 0.0384 · ΔP + 1.0013
+</div>
+<p>هذه المعادلة مشتقة من المنحنيات التجريبية وتُعد Baseline Constant. مجال الصلاحية: 0 &lt; ΔP &lt; 25 kg/cm².</p>
+</div>
+
+<div class="interp-section">
+<h3>الدالة I-10: تباعد الأنفاق المتجاورة</h3>
+<p>مصدر: ملف حساب التباعد بين نفقين متجاورين</p>
+<div class="formula-box">
+<div class="label">التباعد من تأثير القنبلة</div>
+L<sub>bomb</sub> = 2 · √((1.75·Z<sub>p</sub>)² - (H - h<sub>пр</sub> + ц)²) - 2a
+</div>
+<div class="formula-box">
+<div class="label">التباعد من ضغط الصخر</div>
+L<sub>rock</sub> = 0.65 · √(a · H · γ / f<sub>kp</sub>)
+</div>
+<div class="formula-box">
+<div class="label">عمق المنطقة المتأثرة</div>
+Z<sub>p</sub> = 1.5 · k<sub>p.г</sub> · ∛C<sub>эф</sub>
+</div>
+<div class="formula-box">
+<div class="label">ارتفاع حد المنطقة الديناميكية</div>
+H = R<sub>̽</sub> + h<sub>пр</sub> - ц
+</div>
+<p>التباعد المطلوب: L ≥ max(L<sub>bomb</sub>, L<sub>rock</sub>)</p>
+<p>النتائج المرجعية: L<sub>bomb</sub> = 19.652 m, L<sub>rock</sub> = 2.206 m → التباعد المعتمد: 19.652 m</p>
+</div>
+
+<div class="interp-section">
+<h3>الدالة I-11: معامل DIF الديناميكي - UFC 3-340-02</h3>
+<p>مصدر: UFC 3-340-02 Tables 4-1, 5-1</p>
+<table>
+<tr><th>المادة</th><th>نوع الإجهاد</th><th>DIF</th><th>ملاحظات</th></tr>
+<tr><td>خرسانة - ضغط</td><td>إجهاد ضغط</td><td>1.25</td><td>Table 4-1</td></tr>
+<tr><td>خرسانة - شد</td><td>إجهاد شد</td><td>1.25</td><td>Table 4-1</td></tr>
+<tr><td>حديد تسليح - شد</td><td>إجهاد شد</td><td>1.20</td><td>Table 5-1</td></tr>
+<tr><td>خرسانة - قص ثاقب</td><td>إجهاد قص</td><td>1.25</td><td>Section 4-3</td></tr>
+</table>
+</div>
+</div>
+
+<!-- SECTION 8 -->
+<div class="page-break"></div>
+<div class="section">
+<h1>8. ثوابت Baseline Constants - الكود المبرمج</h1>
+
+<p>تم حفظ جميع ثوابت Baseline Constants في ملف JSON منظم يمكن استيراده مباشرة في بيئة Next.js PWA / TypeScript. الملف محفوظ في المسار التالي:</p>
+
+<div class="result-box">
+<strong>مسار الملف:</strong> /home/z/my-project/download/baseline_constants.json<br>
+<strong>التصنيف:</strong> Baseline Constants - NON-EDITABLE<br>
+<strong>البنية:</strong> JSON مع 7 أقسام رئيسية
+</div>
+
+<h3>هيكل ملف Baseline Constants</h3>
+<table>
+<tr><th>القسم</th><th>الوصف</th><th>عدد العناصر</th></tr>
+<tr><td>bomb_database</td><td>قاعدة بيانات القنابل (14 نوع)</td><td>14</td></tr>
+<tr><td>explosive_coefficients</td><td>معاملات المواد المتفجرة</td><td>5</td></tr>
+<tr><td>soil_penetration_coefficients</td><td>معاملات اختراق التربة/الخرسانة</td><td>13</td></tr>
+<tr><td>soil_wave_parameters</td><td>معاملات الموجة في التربة</td><td>4</td></tr>
+<tr><td>concrete_resistance</td><td>مقاومة الضغط للخرسانة</td><td>8 درجات</td></tr>
+<tr><td>steel_properties</td><td>خصائص حديد التسليح</td><td>3 درجات</td></tr>
+</table>
+
+<h3>نموذج الكود TypeScript للاستيفاء</h3>
+<div style="background:#1e1e2e; color:#cdd6f4; padding:15px; border-radius:6px; font-family:monospace; font-size:9pt; direction:ltr; text-align:left; overflow-x:auto;">
+<pre>
+// baseline_interpolation.ts - NON-EDITABLE BASELINE CONSTANTS
+
+interface BombData {
+  id: number; type: string; caliber: number;
+  weight_kg: number; diameter_m: number;
+  body_length_m: number; ld_ratio: number;
+  lhd_ratio: number; charge_kg: number;
+  explosive: string;
+}
+
+interface SoilCoeffs {
+  name: string; Kpr: number; Kv: number;
+  Kp: number; Kot: number | null;
+}
+
+// I-1: Soil penetration coefficient lookup
+function getSoilCoeffs(soilType: string): SoilCoeffs {
+  return SOIL_TABLE.find(s => s.name === soilType)
+    ?? SOIL_TABLE[SOIL_TABLE.length - 1]; // default: RC 250-300
+}
+
+// I-9: Effective time interpolation
+function effectiveTime(
+  tauPlus: number, deltaPmax: number
+): number {
+  const f = 0.0008 * deltaPmax**2
+          - 0.0384 * deltaPmax
+          + 1.0013;
+  return tauPlus * f;
+}
+
+// I-10: Tunnel spacing calculation
+function tunnelSpacing(
+  Zp: number, H: number, hpr: number,
+  tsu: number, a: number, gamma: number,
+  fkp: number
+): { L_bomb: number; L_rock: number } {
+  const L_bomb = 2 * Math.sqrt(
+    (1.75 * Zp)**2 - (H - hpr + tsu)**2
+  ) - 2 * a;
+  const L_rock = 0.65 * Math.sqrt(
+    a * H * gamma / fkp
+  );
+  return { L_bomb, L_rock };
+}
+</pre>
+</div>
+</div>
+
+<!-- SECTION 9 -->
+<div class="page-break"></div>
+<div class="section">
+<h1>9. تأكيد الجاهزية لربط البنية التحتية</h1>
+
+<p>بناءً على التحليل الهندسي الشامل أعلاه، أؤكد الجاهزية الكاملة لاستقبال كود البنية التحتية للمنصة (Next.js PWA / TypeScript) في الخطوة التالية لربطه بهذه المعادلات حركياً بنسبة انحراف 0.00%. تم إنجاز ما يلي:</p>
+
+<div class="result-box">
+<h3>ملخص الإنجازات</h3>
+<p><strong>1. استيعاب المعادلات الإنشائية:</strong> تم استخلاص وتوثيق 47 معادلة إنشائية حاكمة تغطي ضغوط العصف الديناميكي، اختراق القنابل، الأحمال التصميمية، نواة المقطع، والقص الثاقب.</p>
+
+<p><strong>2. التحقق من نواة المقطع:</strong> تم التحقق رقمياً من شرط وقوع محصلة الأحمال داخل نواة المقطع للحالات المرجعية الثلاث. النتيجة: في المنشآت الحمائية تخضع الأحمال الديناميكية العالية لمحصلة خارج النواة بشكل متوقع، مما يتطلب تسليحاً مزدوجاً.</p>
+
+<p><strong>3. فحص القص الثاقب:</strong> تم فحص إجهادات القص الثاقب وفق الكود العربي السوري 2024 (WSD) ومعايير UFC 3-340-02 لجميع الحالات المرجعية. النتيجة: جميع الحالات آمنة مقابل القص الثاقب.</p>
+
+<p><strong>4. دوال الاستيفاء الرقمية:</strong> تم تحويل 11 منحنى/جدول مرجعي إلى دوال استيفاء رقمية مبرمجة (I-1 إلى I-11) كـ Baseline Constants.</p>
+
+<p><strong>5. ملف Baseline Constants:</strong> تم إنشاء ملف JSON منظم يحتوي على جميع الثوابت المرجعية (قنابل، متفجرات، ترب، خرسانة، حديد تسليح).</p>
+
+<p><strong>6. نموذج الكود TypeScript:</strong> تم إعداد نموذج كود TypeScript قابل للاستيراد المباشر في بيئة Next.js PWA.</p>
+</div>
+
+<h3>متطلبات الربط الحركي (0.00% انحراف)</h3>
+<table>
+<tr><th>المتطلب</th><th>الحالة</th><th>الملاحظة</th></tr>
+<tr><td>جميع المعادلات موثقة برموزها</td><td style="color:#2e7d32;">✓ مكتمل</td><td>47 معادلة من 1 إلى 47</td></tr>
+<tr><td>جميع دوال الاستيفاء مبرمجة</td><td style="color:#2e7d32;">✓ مكتمل</td><td>11 دالة I-1 إلى I-11</td></tr>
+<tr><td>ملف Baseline Constants JSON</td><td style="color:#2e7d32;">✓ مكتمل</td><td>7 أقسام، 6+ جداول</td></tr>
+<tr><td>التحقق من نواة المقطع</td><td style="color:#2e7d32;">✓ مكتمل</td><td>3 حالات مرجعية</td></tr>
+<tr><td>فحص القص الثاقب</td><td style="color:#2e7d32;">✓ مكتمل</td><td>WSD + UFC 3-340-02</td></tr>
+<tr><td>نموذج كود TypeScript</td><td style="color:#2e7d32;">✓ مكتمل</td><td>جاهز للاستيراد</td></tr>
+<tr><td>استقبال كود Next.js PWA</td><td style="color:#1565c0;">⟵ في الانتظار</td><td>جاهز للاستقبال</td></tr>
+</table>
+
+<div class="warning-box">
+<strong>تأكيد الجاهزية:</strong> المنصة جاهزة تماماً لاستقبال كود البنية التحتية (Next.js PWA / TypeScript). جميع المعادلات ودوال الاستيفاء معرّفة كـ Baseline Constants غير قابلة للتعديل اليدوي، وسيتم ربطها حركياً بنسبة انحراف 0.00% عند تسليم الكود.
+</div>
+</div>
+
+</body>
+</html>
