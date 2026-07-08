@@ -18,12 +18,12 @@ const bcrypt = require('bcryptjs');
 // ════════════════════════════════════════════════════════
 // ⚙️ الإعدادات — يمكن تعديلها أو ضبطها عبر متغيرات البيئة
 // ════════════════════════════════════════════════════════
-const SUPABASE_URL = process.env.SUPABASE_URL || 'REDACTED_SUPABASE_URL';
-const SUPABASE_KEY = process.env.SUPABASE_KEY || 'REDACTED_SUPABASE_KEY';
+const SUPABASE_URL = process.env.SUPABASE_URL || '';
+const SUPABASE_KEY = process.env.SUPABASE_KEY || '';
 
 const OLD_EMAIL = 'abu-sulaiman@structural-blast.sy';
 const NEW_EMAIL = 'cengbashar96@gmail.com';
-const NEW_PASSWORD = 'REDACTED_ADMIN_PASSWORD';
+const NEW_PASSWORD = process.env.ADMIN_PASSWORD || '';
 
 // ════════════════════════════════════════════════════════
 // 🔐 توليد bcrypt hash (12 جولة)
