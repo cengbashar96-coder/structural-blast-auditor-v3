@@ -1,343 +1,186 @@
 // ═══════════════════════════════════════════════════════════════════════
-// الخطوة 8 — تصميم سماكة الجدران
+// الخطوة 8 — تصميم سماكة الجدران (ديناميكي)
 // منصة المدقق الديناميكي الموحد V3.1
-// حساب سماكة الجدار والأرضية والجدار الداخلي الخرساني
-// مرجع القياس: BMK-02 (MK83 + MEDIUM_SOIL)
 // RTL Arabic | Dark Theme | Responsive
 // ═══════════════════════════════════════════════════════════════════════
 
 'use client';
 
-import React, { useMemo } from 'react';
-import {
-  STEP8_WALL,
-  STEP5_WALL,
-  STEP7_CEILING,
-} from '@/lib/constants/reference-data';
+import React from 'react';
+import { useEngine } from '@/lib/engine/engine-context';
+import { NoDataState } from '@/components/no-data-state';
+import type { GeometryType } from '@/lib/engine/types';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  Building2,
-  Shield,
-  Lock,
-  Ruler,
-  CheckCircle2,
-  Layers,
-  ArrowLeft,
-} from 'lucide-react';
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from '@/components/ui/table';
+import { Building2, CheckCircle2, AlertTriangle, Shield } from 'lucide-react';
 
-// ═══════════════════════════════════════════════════════════════════════
-// دوال مساعدة
-// ═══════════════════════════════════════════════════════════════════════
+function fmt(v: number, d = 2): string { return isFinite(v) ? v.toFixed(d) : '—'; }
 
-function fmt(val: number, decimals: number = 4): string {
-  if (!isFinite(val)) return '∞';
-  return val.toFixed(decimals);
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// حسابات الخطوة 8
-// ═══════════════════════════════════════════════════════════════════════
-
-/** المدخلات من الخطوة 5+7 */
-const inputs = {
-  Pp_wall: STEP5_WALL.Pp,
-  Hp_final: STEP7_CEILING.Hp_final,
-  mu_struct: STEP5_WALL.mu_struct,
-  Rsd: STEP5_WALL.Rsd,
-  Rbd: STEP5_WALL.Rbd,
-  eta: STEP5_WALL.eta,
-} as const;
-
-/** القيم المصممة */
-const Hc = STEP8_WALL.Hc_final;      // سماكة الجدار
-const Hf = STEP8_WALL.Hf_final;      // سماكة الأرضية (≈ 60% من Hp)
-const Hvct = STEP8_WALL.Hvct_final;  // سماكة الجدار الداخلي (الحد الأدنى وفق الكود)
-const Hp = STEP7_CEILING.Hp_final;   // سماكة السقف من الخطوة 7
-
-/** نسبة Hf إلى Hp */
-const HfToHpRatio = Hf / Hp;
-
-// ═══════════════════════════════════════════════════════════════════════
-// المكون الرئيسي
-// ═══════════════════════════════════════════════════════════════════════
+const GEO_LABELS: Record<GeometryType, { ar: string; icon: string }> = {
+  RECTANGULAR: { ar: 'مستطيل', icon: '▬' },
+  CIRCULAR: { ar: 'دائري', icon: '●' },
+  ARCHED: { ar: 'قوسي', icon: '⌓' },
+};
 
 export default function Step8WallPage() {
-  const verified = useMemo(() => {
-    const hcOk = Math.abs(Hc - STEP8_WALL.Hc_final) / STEP8_WALL.Hc_final < 0.01;
-    const hfOk = Math.abs(Hf - STEP8_WALL.Hf_final) / STEP8_WALL.Hf_final < 0.01;
-    const hvctOk = Math.abs(Hvct - STEP8_WALL.Hvct_final) / STEP8_WALL.Hvct_final < 0.01;
-    return { hcOk, hfOk, hvctOk, allOk: hcOk && hfOk && hvctOk };
-  }, []);
+  const { engineOutput, hasComputed } = useEngine();
 
-  // أشرطة المقارنة البصرية
-  const maxValue = Hp; // أكبر قيمة هي Hp
-  const barData = [
-    { label: 'Hp', labelAr: 'سماكة السقف', value: Hp, color: 'bg-emerald-400', textColor: 'text-emerald-400' },
-    { label: 'Hc', labelAr: 'سماكة الجدار', value: Hc, color: 'bg-teal-400', textColor: 'text-teal-400' },
-    { label: 'Hf', labelAr: 'سماكة الأرضية', value: Hf, color: 'bg-cyan-400', textColor: 'text-cyan-400' },
-    { label: 'Hvct', labelAr: 'الجدار الداخلي', value: Hvct, color: 'bg-sky-400', textColor: 'text-sky-400' },
-  ];
+  if (!hasComputed || !engineOutput) {
+    return (
+      <div className="space-y-6 max-w-7xl mx-auto" dir="rtl">
+        <Header />
+        <NoDataState description="أدخل معطيات المشروع ثم احسب للحصول على سماكة الجدران المطلوبة" />
+      </div>
+    );
+  }
+
+  const { structural, comparison } = engineOutput;
+  const recommended = comparison.recommendedGeometry;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100" dir="rtl">
-      <div className="max-w-5xl mx-auto space-y-6 p-4 sm:p-6">
+    <div className="space-y-6 max-w-7xl mx-auto" dir="rtl">
+      <Header />
+      <Badge variant="outline" className="text-emerald-400 border-emerald-500/30 mb-2">
+        <CheckCircle2 className="w-3 h-3 ml-1" /> تم الحساب
+      </Badge>
 
-        {/* ═══════════ رأس الصفحة ═══════════ */}
-        <header className="space-y-2">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-              <Building2 className="w-6 h-6 text-emerald-400" />
-            </div>
+      {/* السماكة الموصى بها */}
+      <Card className="border-emerald-500/30 bg-emerald-950/20">
+        <CardContent className="py-4">
+          <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-slate-50">
-                الخطوة 8: تصميم سماكة الجدران
-              </h1>
-              <p className="text-slate-400 text-sm sm:text-base mt-1">
-                حساب سماكة الجدار والأرضية والجدار الداخلي الخرساني
+              <p className="text-slate-500 text-xs mb-1">الشكل الموصى به</p>
+              <p className="text-2xl font-bold text-emerald-400">{GEO_LABELS[recommended].ar}</p>
+            </div>
+            <div className="text-left">
+              <p className="text-slate-500 text-xs mb-1">سماكة الجدار المطلوبة</p>
+              <p className="text-3xl font-mono font-bold text-emerald-400">
+                {fmt(structural[recommended].requiredThicknessMeters * 100, 1)}
+                <span className="text-base text-slate-500 mr-1">cm</span>
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="border-emerald-500/30 text-emerald-400 bg-emerald-500/10">
-              <Shield className="w-3 h-3 ml-1" />
-              BMK-02
-            </Badge>
-            <Badge variant="outline" className="border-slate-700 text-slate-400 bg-slate-800/50">
-              إكسيل 6 — حساب سماكة الجدران
-            </Badge>
-          </div>
-        </header>
+        </CardContent>
+      </Card>
 
-        <Separator className="bg-slate-800/60" />
+      {/* مقارنة الأشكال */}
+      <Tabs defaultValue={recommended} className="space-y-4">
+        <TabsList className="bg-slate-900/60 border border-slate-800/60">
+          {(['RECTANGULAR', 'CIRCULAR', 'ARCHED'] as GeometryType[]).map(geo => (
+            <TabsTrigger
+              key={geo}
+              value={geo}
+              className="data-[state=active]:bg-amber-600/20 data-[state=active]:text-amber-300"
+            >
+              <span className="ml-1">{GEO_LABELS[geo].icon}</span>
+              {GEO_LABELS[geo].ar}
+              {geo === recommended && (
+                <Badge className="mr-2 bg-emerald-600 text-white text-[10px] px-1.5 py-0">موصى</Badge>
+              )}
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
-        {/* ═══════════ القسم أ: المدخلات من الخطوة 5+7 ═══════════ */}
-        <Card className="bg-slate-900/80 border-slate-800/60">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg text-slate-200">
-              <ArrowLeft className="w-5 h-5 text-emerald-400" />
-              المدخلات من الخطوة 5+7
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              {[
-                { label: 'Pp_wall', value: fmt(inputs.Pp_wall, 4), unit: 'kg/cm²', desc: 'الضغط التصميمي على الجدار', fromStep: 5 },
-                { label: 'Hp_final', value: fmt(inputs.Hp_final, 2), unit: 'cm', desc: 'سماكة السقف النهائية', fromStep: 7 },
-                { label: 'μ_struct', value: fmt(inputs.mu_struct, 4), unit: '-', desc: 'معامل المطاوعة الإنشائية', fromStep: 5 },
-                { label: 'Rsd', value: fmt(inputs.Rsd, 1), unit: 'kg/cm²', desc: 'مقاومة التسليح الديناميكية', fromStep: 5 },
-                { label: 'Rbd', value: fmt(inputs.Rbd, 0), unit: 'kg/cm²', desc: 'مقاومة الانحناء الديناميكية', fromStep: 5 },
-                { label: 'η', value: fmt(inputs.eta, 4), unit: '-', desc: 'معامل الديناميكية', fromStep: 5 },
-              ].map((item) => (
-                <div
-                  key={item.label}
-                  className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50 space-y-1"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1">
-                      <Lock className="w-3 h-3 text-amber-400" />
-                      <span className="text-xs text-slate-400 font-mono">{item.label}</span>
-                    </div>
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-slate-700 text-slate-500 bg-slate-800/50">
-                      خطوة {item.fromStep}
+        {(['RECTANGULAR', 'CIRCULAR', 'ARCHED'] as GeometryType[]).map(geo => {
+          const s = structural[geo];
+          const v = s.validation;
+          return (
+            <TabsContent key={geo} value={geo}>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <Card className="border-cyan-500/30 bg-cyan-950/20">
+                  <CardContent className="py-4 text-center">
+                    <p className="text-slate-500 text-xs mb-1">سماكة الجدار</p>
+                    <p className="text-3xl font-mono font-bold text-cyan-400">{fmt(s.requiredThicknessMeters * 100, 1)}</p>
+                    <p className="text-slate-500 text-xs">cm</p>
+                  </CardContent>
+                </Card>
+                <Card className="border-purple-500/30 bg-purple-950/20">
+                  <CardContent className="py-4 text-center">
+                    <p className="text-slate-500 text-xs mb-1">مساحة التسليح</p>
+                    <p className="text-3xl font-mono font-bold text-purple-400">{fmt(s.requiredSteelAreaCm2PerMeter, 2)}</p>
+                    <p className="text-slate-500 text-xs">cm²/m</p>
+                  </CardContent>
+                </Card>
+                <Card className="border-amber-500/30 bg-amber-950/20">
+                  <CardContent className="py-4 text-center">
+                    <p className="text-slate-500 text-xs mb-1">نسبة المطاوعة</p>
+                    <p className="text-3xl font-mono font-bold text-amber-400">{fmt(s.ductilityRatio, 3)}</p>
+                    <p className="text-slate-500 text-xs">μ</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card className="border-slate-800/60 bg-slate-950/80">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-slate-200 text-sm flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-amber-400" />
+                    تقرير التحقق — {GEO_LABELS[geo].ar}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <Badge variant={v.status === 'SUCCESS' ? 'default' : v.status === 'WARNING' ? 'secondary' : 'destructive'}
+                      className={v.status === 'SUCCESS' ? 'bg-emerald-600' : ''}>
+                      {v.status === 'SUCCESS' ? 'مقبول ✓' : v.status === 'WARNING' ? 'تحذير ⚠' : 'مرفوض ✗'}
                     </Badge>
+                    <span className="text-slate-400 text-xs">{v.explanation}</span>
                   </div>
-                  <div className="text-emerald-400 font-bold font-mono text-lg">{item.value}</div>
-                  <div className="text-xs text-slate-500">{item.unit} — {item.desc}</div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* ═══════════ القسم ب: نتائج التصميم — ثلاث بطاقات مميزة ═══════════ */}
-        <div className="space-y-2">
-          <h2 className="text-lg font-bold text-slate-200 flex items-center gap-2">
-            <Ruler className="w-5 h-5 text-emerald-400" />
-            نتائج التصميم
-          </h2>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
-          {/* بطاقة Hc */}
-          <div className="relative overflow-hidden rounded-xl border-2 border-emerald-500/40 bg-gradient-to-br from-emerald-500/10 via-slate-900/80 to-emerald-500/5 p-6">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full translate-x-6 -translate-y-6 blur-2xl" />
-            <div className="relative space-y-3">
-              <div className="flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-emerald-400" />
-                <span className="text-slate-300 text-sm font-medium">سماكة الجدار</span>
-              </div>
-              <div className="flex items-baseline gap-2">
-                <span className="font-mono font-bold text-emerald-400" style={{ fontSize: '2.5rem', lineHeight: 1 }}>
-                  {fmt(Hc, 2)}
-                </span>
-                <span className="text-emerald-400/70 text-lg">cm</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-xs text-slate-500">Hc</span>
-                <div className="flex items-center gap-1">
-                  {verified.hcOk ? (
-                    <>
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                      <span className="text-emerald-400/70 text-xs">BMK-02 ✓</span>
-                    </>
-                  ) : (
-                    <span className="text-amber-400 text-xs">قيد المراجعة</span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* بطاقة Hf */}
-          <div className="relative overflow-hidden rounded-xl border-2 border-emerald-500/40 bg-gradient-to-br from-emerald-500/10 via-slate-900/80 to-emerald-500/5 p-6">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full translate-x-6 -translate-y-6 blur-2xl" />
-            <div className="relative space-y-3">
-              <div className="flex items-center gap-2">
-                <Layers className="w-5 h-5 text-emerald-400" />
-                <span className="text-slate-300 text-sm font-medium">سماكة الأرضية</span>
-              </div>
-              <div className="flex items-baseline gap-2">
-                <span className="font-mono font-bold text-emerald-400" style={{ fontSize: '2.5rem', lineHeight: 1 }}>
-                  {fmt(Hf, 2)}
-                </span>
-                <span className="text-emerald-400/70 text-lg">cm</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-xs text-slate-500">Hf ≈ 60% Hp</span>
-                <div className="flex items-center gap-1">
-                  {verified.hfOk ? (
-                    <>
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                      <span className="text-emerald-400/70 text-xs">BMK-02 ✓</span>
-                    </>
-                  ) : (
-                    <span className="text-amber-400 text-xs">قيد المراجعة</span>
-                  )}
-                </div>
-              </div>
-              <div className="text-xs text-slate-500">
-                النسبة الفعلية: {fmt(HfToHpRatio * 100, 1)}% من Hp
-              </div>
-            </div>
-          </div>
-
-          {/* بطاقة Hvct */}
-          <div className="relative overflow-hidden rounded-xl border-2 border-emerald-500/40 bg-gradient-to-br from-emerald-500/10 via-slate-900/80 to-emerald-500/5 p-6">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full translate-x-6 -translate-y-6 blur-2xl" />
-            <div className="relative space-y-3">
-              <div className="flex items-center gap-2">
-                <Shield className="w-5 h-5 text-emerald-400" />
-                <span className="text-slate-300 text-sm font-medium">سماكة الجدار الداخلي</span>
-              </div>
-              <div className="flex items-baseline gap-2">
-                <span className="font-mono font-bold text-emerald-400" style={{ fontSize: '2.5rem', lineHeight: 1 }}>
-                  {fmt(Hvct, 0)}
-                </span>
-                <span className="text-emerald-400/70 text-lg">cm</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-xs text-slate-500">Hvct — الحد الأدنى وفق الكود</span>
-                <div className="flex items-center gap-1">
-                  {verified.hvctOk ? (
-                    <>
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                      <span className="text-emerald-400/70 text-xs">BMK-02 ✓</span>
-                    </>
-                  ) : (
-                    <span className="text-amber-400 text-xs">قيد المراجعة</span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ═══════════ القسم ج: ملخص المقارنة — رسم بياني شريطي ═══════════ */}
-        <Card className="bg-slate-900/80 border-slate-800/60">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg text-slate-200">
-              <Ruler className="w-5 h-5 text-emerald-400" />
-              ملخص المقارنة
-              <span className="text-slate-500 text-sm font-normal">Hp &gt; Hc &gt; Hf &gt; Hvct</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            {barData.map((bar) => {
-              const widthPct = (bar.value / maxValue) * 100;
-              return (
-                <div key={bar.label} className="space-y-1.5">
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <span className={`font-mono font-bold ${bar.textColor}`}>{bar.label}</span>
-                      <span className="text-slate-400">{bar.labelAr}</span>
+                  <div className="grid grid-cols-3 gap-3 text-xs">
+                    <div className="text-center">
+                      <span className="text-slate-500">نسبة اللامركزية e/h</span>
+                      <p className="font-mono text-slate-300">{fmt(v.eccentricityRatio, 3)}</p>
                     </div>
-                    <span className={`font-mono font-bold ${bar.textColor}`}>
-                      {fmt(bar.value, 2)} cm
-                    </span>
+                    <div className="text-center">
+                      <span className="text-slate-500">نسبة القص الثاقب</span>
+                      <p className="font-mono text-slate-300">{fmt(v.punchingShearRatio, 3)}</p>
+                    </div>
+                    <div className="text-center">
+                      <span className="text-slate-500">نسبة التسليح</span>
+                      <p className="font-mono text-slate-300">{fmt(v.reinforcementRatio, 4)}</p>
+                    </div>
                   </div>
-                  <div className="w-full h-8 bg-slate-800/50 rounded-lg overflow-hidden border border-slate-700/30">
-                    <div
-                      className={`h-full ${bar.color} rounded-lg transition-all duration-700 ease-out`}
-                      style={{ width: `${widthPct}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
+                  {v.failures.length > 0 && (
+                    <div className="bg-red-950/30 border border-red-500/20 rounded-lg p-3">
+                      <p className="text-red-400 text-xs font-bold mb-1">إخفاقات:</p>
+                      <ul className="space-y-0.5">
+                        {v.failures.map((f, i) => (
+                          <li key={i} className="text-red-400/80 text-xs flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3" /> {f}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          );
+        })}
+      </Tabs>
 
-            <Separator className="bg-slate-800/60" />
+      <Card className="border-slate-800/60 bg-slate-950/80">
+        <CardContent className="py-3">
+          <p className="text-slate-400 text-xs leading-relaxed">{comparison.explanation}</p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
-            {/* العلاقات بين السماكات */}
-            <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50 space-y-3">
-              <h3 className="text-sm font-medium text-slate-300">العلاقات بين السماكات</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span className="text-slate-400">
-                    <span className="text-emerald-400 font-mono">Hp</span> &gt; <span className="text-teal-400 font-mono">Hc</span>
-                    <span className="text-slate-500"> — السقف أسمك من الجدار</span>
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span className="text-slate-400">
-                    <span className="text-teal-400 font-mono">Hc</span> &gt; <span className="text-cyan-400 font-mono">Hf</span>
-                    <span className="text-slate-500"> — الجدار أسمك من الأرضية</span>
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span className="text-slate-400">
-                    <span className="text-cyan-400 font-mono">Hf</span> &gt; <span className="text-sky-400 font-mono">Hvct</span>
-                    <span className="text-slate-500"> — الأرضية أسمك من الجدار الداخلي</span>
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span className="text-slate-400">
-                    <span className="text-cyan-400 font-mono">Hf</span> ≈ 60% × <span className="text-emerald-400 font-mono">Hp</span>
-                    <span className="text-slate-500"> — الأرضية 60% من السقف</span>
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* تأكيد BMK-02 */}
-            <div className="flex items-center gap-2 justify-center text-sm py-2">
-              <Shield className="w-4 h-4 text-emerald-400" />
-              <span className="text-emerald-400/80">جميع القيم متحقق منها وفق BMK-02</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* تذييل */}
-        <div className="text-center text-xs text-slate-600 py-4">
-          المدقق الديناميكي الموحد V3.1 — الخطوة 8: تصميم سماكة الجدران — BMK-02
-        </div>
+function Header() {
+  return (
+    <div className="flex items-center gap-3">
+      <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-amber-500/10 border border-amber-500/20">
+        <Building2 className="w-5 h-5 text-amber-400" />
+      </div>
+      <div>
+        <h1 className="text-xl font-bold text-slate-100">تصميم سماكة الجدران</h1>
+        <p className="text-xs text-slate-500">الحساب الإنشائي لسماكة الجدران والتسليح المطلوب</p>
       </div>
     </div>
   );

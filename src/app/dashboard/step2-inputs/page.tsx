@@ -1,21 +1,32 @@
 // ═══════════════════════════════════════════════════════════════════════
-// الخطوة 2 — المدخلات والجداول المرجعية
+// الخطوة 2 — واجهة إدخال المعطيات الشاملة
 // منصة المدقق الديناميكي الموحد V3.1
-// عرض بيانات السلاح، جداول الاستيفاء، والبيانات الهندسية (مقفلة BMK-02)
+// الواجهة الرئيسية التي يدخل منها المستخدم معطيات التصميم
+// ثم يُشغّل المحرك للحصول على التصميم الكامل
 // RTL Arabic | Dark Theme | Responsive
 // ═══════════════════════════════════════════════════════════════════════
 
 'use client';
 
-import React from 'react';
-import {
-  STEP2_INPUTS,
-  STEP2_LOOKUPS,
-  STEP2_GEOMETRY,
-} from '@/lib/constants/reference-data';
+import React, { useMemo } from 'react';
+import { useEngine, DEFAULT_USER_INPUT, type UserInputForm } from '@/lib/engine/engine-context';
+import { WEAPONS, SOILS } from '@/lib/engine/constants';
+import type { SoilTypeCode } from '@/lib/engine/types';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Table,
   TableBody,
@@ -24,517 +35,786 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Separator } from '@/components/ui/separator';
-
 import {
-  Lock,
-  Database,
-  Table2,
-  Layers,
   Crosshair,
-  ShieldCheck,
-  Cuboid,
+  Layers,
+  Shield,
+  Building2,
+  ArrowRight,
+  Loader2,
+  AlertTriangle,
+  CheckCircle2,
+  RotateCcw,
+  Zap,
   ChevronLeft,
-  ChevronRight,
+  Info,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 
 // ═══════════════════════════════════════════════════════════════════════
-// أنواع مساعدة
+// مكون حقل إدخال رقمي مع وحدة
 // ═══════════════════════════════════════════════════════════════════════
 
-interface DataRow {
-  key: string;
-  labelAr: string;
+interface NumberFieldProps {
+  label: string;
   symbol: string;
-  value: number;
   unit: string;
-  locked: boolean;
+  value: number;
+  onChange: (v: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+  description?: string;
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// بيانات الجداول
-// ═══════════════════════════════════════════════════════════════════════
-
-const WEAPON_DATA: DataRow[] = [
-  { key: 'P', labelAr: 'وزن القنبلة', symbol: 'P', value: STEP2_INPUTS.P, unit: 'kg', locked: true },
-  { key: 'lo_b', labelAr: 'الطول الكلي', symbol: 'l₀_b', value: STEP2_INPUTS.lo_b, unit: 'm', locked: true },
-  { key: 'lk', labelAr: 'طول الجسم', symbol: 'lk', value: STEP2_INPUTS.lk, unit: 'm', locked: true },
-  { key: 'dk', labelAr: 'قطر القنبلة', symbol: 'dk', value: STEP2_INPUTS.dk, unit: 'm', locked: true },
-  { key: 'ld_ratio', labelAr: 'نسبة الطول للقطر', symbol: 'L/D', value: STEP2_INPUTS.ld_ratio, unit: '—', locked: true },
-  { key: 'lhd_ratio', labelAr: 'نسبة طول الرأس للقطر', symbol: 'Lh/D', value: STEP2_INPUTS.lhd_ratio, unit: '—', locked: true },
-  { key: 'C', labelAr: 'وزن الشحنة', symbol: 'C', value: STEP2_INPUTS.C, unit: 'kg', locked: true },
-  { key: 'V', labelAr: 'سرعة الاصطدام', symbol: 'V', value: STEP2_INPUTS.V, unit: 'm/s', locked: true },
-  { key: 'alpha', labelAr: 'زاوية الاصطدام', symbol: 'α', value: STEP2_INPUTS.alpha, unit: '°', locked: true },
-  { key: 'beta', labelAr: 'زاوية الانعكاس', symbol: 'β', value: STEP2_INPUTS.beta, unit: '°', locked: true },
-  { key: 'Z', labelAr: 'عمق السقف', symbol: 'Z', value: STEP2_INPUTS.Z, unit: 'm', locked: true },
-];
-
-const LOOKUP_DATA: DataRow[] = [
-  { key: 'K1', labelAr: 'معامل المتفجرات', symbol: 'K₁', value: STEP2_LOOKUPS.K1, unit: '—', locked: true },
-  { key: 'kpr_g', labelAr: 'معامل اختراق التربة', symbol: 'kpr_g', value: STEP2_LOOKUPS.kpr_g, unit: '—', locked: true },
-  { key: 'kpr_b', labelAr: 'معامل اختراق الخرسانة', symbol: 'kpr_b', value: STEP2_LOOKUPS.kpr_b, unit: '—', locked: true },
-  { key: 'RbH', labelAr: 'مقاومة الخرسانة', symbol: 'RbH', value: STEP2_LOOKUPS.RbH, unit: 'kg/cm²', locked: true },
-  { key: 'RsH', labelAr: 'إجهاد خضوع الحديد', symbol: 'RsH', value: STEP2_LOOKUPS.RsH, unit: 'kg/cm²', locked: true },
-  { key: 'gamma_b', labelAr: 'كثافة الخرسانة', symbol: 'γb', value: STEP2_LOOKUPS.gamma_b, unit: 'kg/m³', locked: true },
-  { key: 'gamma_g', labelAr: 'كثافة التربة', symbol: 'γg', value: STEP2_LOOKUPS.gamma_g, unit: 'kg/m³', locked: true },
-  { key: 'Kpod_b', labelAr: 'معامل التأسيس خرسانة', symbol: 'Kpod_b', value: STEP2_LOOKUPS.Kpod_b, unit: '—', locked: true },
-  { key: 'Kpod_s', labelAr: 'معامل التأسيس تربة', symbol: 'Kpod_s', value: STEP2_LOOKUPS.Kpod_s, unit: '—', locked: true },
-  { key: 'n0', labelAr: 'معامل الأمان', symbol: 'n₀', value: STEP2_LOOKUPS.n0, unit: '—', locked: true },
-  { key: 'R_bar', labelAr: 'معامل البعد المختزل', symbol: 'R̄', value: STEP2_LOOKUPS.R_bar, unit: '—', locked: true },
-];
-
-const GEOMETRY_DATA: DataRow[] = [
-  { key: 'a_et', labelAr: 'عدد الطوابق', symbol: 'a_et', value: STEP2_GEOMETRY.a_et, unit: '—', locked: true },
-  { key: 'bp', labelAr: 'البحر الطويل', symbol: 'bp', value: STEP2_GEOMETRY.bp, unit: 'm', locked: true },
-  { key: 'ap', labelAr: 'البحر القصير', symbol: 'ap', value: STEP2_GEOMETRY.ap, unit: 'm', locked: true },
-  { key: 'Lk', labelAr: 'طول الكابول', symbol: 'Lk', value: STEP2_GEOMETRY.Lk, unit: 'cm', locked: true },
-  { key: 'Bk', labelAr: 'عرض الكابول', symbol: 'Bk', value: STEP2_GEOMETRY.Bk, unit: 'cm', locked: true },
-  { key: 'Pk', labelAr: 'حمل الكابول', symbol: 'Pk', value: STEP2_GEOMETRY.Pk, unit: '—', locked: true },
-  { key: 'Hct', labelAr: 'سماكة السقف التصميمية', symbol: 'Hct', value: STEP2_GEOMETRY.Hct, unit: 'm', locked: true },
-  { key: 'Hvct', labelAr: 'سماكة الجدار الداخلي', symbol: 'Hvct', value: STEP2_GEOMETRY.Hvct, unit: 'm', locked: true },
-  { key: 'Hf', labelAr: 'سماكة الأرضية', symbol: 'Hf', value: STEP2_GEOMETRY.Hf, unit: 'm', locked: true },
-  { key: 'Hp', labelAr: 'سماكة السقف', symbol: 'Hp', value: STEP2_GEOMETRY.Hp, unit: 'm', locked: true },
-  { key: 'Ea', labelAr: 'معامل المرونة', symbol: 'Ea', value: STEP2_GEOMETRY.Ea, unit: 'kg/cm²', locked: true },
-  { key: 'xi', labelAr: 'معامل التخميد', symbol: 'ξ', value: STEP2_GEOMETRY.xi, unit: '—', locked: true },
-];
-
-// ═══════════════════════════════════════════════════════════════════════
-// دوال مساعدة
-// ═══════════════════════════════════════════════════════════════════════
-
-function formatValue(value: number): string {
-  if (!isFinite(value)) return '—';
-  if (Math.abs(value) < 0.001 && value !== 0) return value.toExponential(1);
-  if (value >= 10000) return value.toLocaleString('en-US', { maximumFractionDigits: 0 });
-  if (value >= 100) return value.toFixed(2);
-  if (value >= 1) return value.toFixed(4);
-  return value.toFixed(4);
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// المكوّن الفرعي: جدول بيانات
-// ═══════════════════════════════════════════════════════════════════════
-
-function DataTable({
-  title,
-  icon: Icon,
-  badgeText,
-  data,
-}: {
-  title: string;
-  icon: React.ElementType;
-  badgeText: string;
-  data: DataRow[];
-}) {
+function NumberField({ label, symbol, unit, value, onChange, min, max, step = 0.01, description }: NumberFieldProps) {
   return (
-    <Card className="bg-slate-900/80 border-slate-800/60 overflow-hidden">
-      {/* شريط علوي ملون */}
-      <div className="h-0.5 bg-emerald-500/60" />
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-semibold text-slate-200 flex items-center gap-2">
-          <Icon className="size-4 text-emerald-400" />
-          {title}
-          <Badge
-            variant="outline"
-            className="border-emerald-500/30 text-emerald-400 text-[10px] px-2 py-0 mr-2"
-          >
-            {badgeText}
-          </Badge>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="p-0">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-b border-slate-700/40 hover:bg-transparent">
-                <TableHead className="text-slate-400 text-xs font-semibold w-8 text-center">
-                  #
-                </TableHead>
-                <TableHead className="text-slate-400 text-xs font-semibold">
-                  الوصف
-                </TableHead>
-                <TableHead className="text-slate-400 text-xs font-semibold text-center">
-                  الرمز
-                </TableHead>
-                <TableHead className="text-slate-400 text-xs font-semibold text-left font-mono">
-                  القيمة
-                </TableHead>
-                <TableHead className="text-slate-400 text-xs font-semibold text-center">
-                  الوحدة
-                </TableHead>
-                <TableHead className="text-slate-400 text-xs font-semibold text-center">
-                  الحالة
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data.map((row, idx) => (
-                <TableRow
-                  key={row.key}
-                  className={`border-b border-slate-800/60 ${
-                    idx % 2 === 0 ? 'bg-slate-800/20' : ''
-                  } hover:bg-slate-800/40`}
-                >
-                  <TableCell className="py-2.5 text-center text-slate-600 text-xs font-mono">
-                    {idx + 1}
-                  </TableCell>
-                  <TableCell className="py-2.5 text-xs text-slate-300 font-medium">
-                    {row.labelAr}
-                  </TableCell>
-                  <TableCell className="py-2.5 text-center">
-                    <Badge
-                      variant="outline"
-                      className="border-emerald-500/30 text-emerald-400 font-mono text-[11px] px-1.5 py-0"
-                    >
-                      {row.symbol}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="py-2.5 text-xs text-left font-mono text-emerald-400 font-semibold">
-                    {formatValue(row.value)}
-                  </TableCell>
-                  <TableCell className="py-2.5 text-center text-xs text-slate-500 font-mono">
-                    {row.unit}
-                  </TableCell>
-                  <TableCell className="py-2.5 text-center">
-                    {row.locked ? (
-                      <Lock className="size-3.5 text-amber-500/80 inline-block" />
-                    ) : (
-                      <span className="text-slate-600 text-[10px]">—</span>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
-    </Card>
+    <div className="space-y-1.5">
+      <Label className="text-slate-300 text-xs flex items-center gap-1.5">
+        <span className="text-cyan-400 font-mono">{symbol}</span>
+        <span>{label}</span>
+        <span className="text-slate-500">({unit})</span>
+      </Label>
+      {description && (
+        <p className="text-[10px] text-slate-500 leading-tight">{description}</p>
+      )}
+      <Input
+        type="number"
+        value={value}
+        onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
+        min={min}
+        max={max}
+        step={step}
+        className="bg-slate-900/80 border-slate-700 text-slate-100 font-mono text-sm h-9 focus:border-cyan-500 focus:ring-cyan-500/20"
+      />
+    </div>
   );
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// درجات الخرسانة والحديد
+// ═══════════════════════════════════════════════════════════════════════
+
+const CONCRETE_GRADES = [
+  { grade: 'B150', fcMpa: 15, RbH: 150, labelAr: 'بيتون عادي 150 كغ/سم²' },
+  { grade: 'B200', fcMpa: 20, RbH: 200, labelAr: 'بيتون عادي 200 كغ/سم²' },
+  { grade: 'B225', fcMpa: 22.5, RbH: 225, labelAr: 'بيتون عادي 225 كغ/سم²' },
+  { grade: 'B250', fcMpa: 25, RbH: 250, labelAr: 'بيتون مسلح 250 كغ/سم²' },
+  { grade: 'B300', fcMpa: 30, RbH: 300, labelAr: 'بيتون مسلح 300 كغ/سم²' },
+  { grade: 'B350', fcMpa: 35, RbH: 350, labelAr: 'بيتون مسلح 350 كغ/سم²' },
+  { grade: 'B400', fcMpa: 40, RbH: 400, labelAr: 'بيتون عالي المقاومة 400 كغ/سم²' },
+];
+
+const STEEL_GRADES = [
+  { grade: 'A240', fyMpa: 240, labelAr: 'حديد عادي 2400 كغ/سم²' },
+  { grade: 'A300', fyMpa: 300, labelAr: 'حديد متوسط 3000 كغ/سم²' },
+  { grade: 'A400', fyMpa: 400, labelAr: 'حديد عالي المقاومة 4000 كغ/سم²' },
+  { grade: 'A500', fyMpa: 500, labelAr: 'حديد عالي المقاومة 5000 كغ/سم²' },
+  { grade: 'A600', fyMpa: 600, labelAr: 'حديد خاص 6000 كغ/سم²' },
+];
 
 // ═══════════════════════════════════════════════════════════════════════
 // الصفحة الرئيسية
 // ═══════════════════════════════════════════════════════════════════════
 
 export default function Step2InputsPage() {
-  const totalFields = WEAPON_DATA.length + LOOKUP_DATA.length + GEOMETRY_DATA.length;
-  const lockedFields = [...WEAPON_DATA, ...LOOKUP_DATA, ...GEOMETRY_DATA].filter(
-    (d) => d.locked
-  ).length;
+  const { userInput, updateField, updateFields, resetInputs, runComputation, isComputing, engineOutput, hasComputed, error } = useEngine();
+
+  // بيانات السلاح المختار
+  const selectedWeapon = useMemo(() => {
+    return WEAPONS.find(w => w.id === userInput.weaponId);
+  }, [userInput.weaponId]);
+
+  // بيانات التربة المختارة
+  const selectedSoil = useMemo(() => {
+    return SOILS.find(s => s.code === userInput.soilTypeCode);
+  }, [userInput.soilTypeCode]);
+
+  // عند تغيير درجة الخرسانة
+  const handleConcreteGradeChange = (grade: string) => {
+    const cg = CONCRETE_GRADES.find(g => g.grade === grade);
+    if (cg) {
+      updateFields({
+        concreteGrade: cg.grade,
+        fcMpa: cg.fcMpa,
+      });
+    }
+  };
+
+  // عند تغيير درجة الحديد
+  const handleSteelGradeChange = (grade: string) => {
+    const sg = STEEL_GRADES.find(g => g.grade === grade);
+    if (sg) {
+      updateFields({
+        steelGrade: sg.grade,
+        fyMpa: sg.fyMpa,
+      });
+    }
+  };
 
   return (
-    <div
-      className="space-y-6"
-      dir="rtl"
-      role="region"
-      aria-labelledby="step2-main-heading"
-    >
-      {/* ═══════════════════════════════════════════════════════════════ */}
-      {/* الرأس الرئيسي                                                 */}
-      {/* ═══════════════════════════════════════════════════════════════ */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-800/60 pb-4 gap-4">
-        <div>
-          <h1
-            id="step2-main-heading"
-            className="text-xl font-bold text-slate-100 flex items-center gap-2"
-          >
-            <Database className="size-5 text-emerald-400" />
-            الخطوة 2: المدخلات والجداول المرجعية
-            <Badge className="bg-emerald-600/80 text-white text-[10px] px-2 py-0.5 mr-2">
-              إكسيل 1
-            </Badge>
-          </h1>
-          <p className="text-sm text-slate-400 mt-1.5">
-            بيانات السلاح ومعاملات التربة والقيم الهندسية المرجعية للحالة القياسية BMK-02
-          </p>
+    <div className="space-y-6 max-w-7xl mx-auto" dir="rtl">
+      {/* ─── الرأس ─── */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-cyan-500/10 border border-cyan-500/20">
+            <Layers className="w-5 h-5 text-cyan-400" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-slate-100">مدخلات التصميم</h1>
+            <p className="text-xs text-slate-500">أدخل معطيات المشروع ثم اضغط &quot;احسب&quot; للحصول على التصميم الكامل</p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
-          <Badge
+          <Button
             variant="outline"
-            className="border-amber-500/30 text-amber-400 text-[10px] px-2 py-0.5"
+            size="sm"
+            onClick={resetInputs}
+            className="text-slate-400 border-slate-700 hover:text-slate-200 hover:border-slate-600"
           >
-            <Lock className="size-3 ml-1" />
-            مقفل
-          </Badge>
-          <Badge
-            variant="outline"
-            className="border-slate-700 text-slate-400 font-mono text-[10px]"
+            <RotateCcw className="w-3.5 h-3.5 ml-1.5" />
+            إعادة تعيين
+          </Button>
+          <Button
+            onClick={runComputation}
+            disabled={isComputing}
+            className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-6"
           >
-            {lockedFields}/{totalFields} قيم مقفلة
-          </Badge>
+            {isComputing ? (
+              <>
+                <Loader2 className="w-4 h-4 ml-1.5 animate-spin" />
+                جاري الحساب...
+              </>
+            ) : (
+              <>
+                <Zap className="w-4 h-4 ml-1.5" />
+                احسب التصميم
+              </>
+            )}
+          </Button>
         </div>
       </div>
 
-      {/* ═══════════════════════════════════════════════════════════════ */}
-      {/* القسم أ — بيانات السلاح                                      */}
-      {/* ═══════════════════════════════════════════════════════════════ */}
-      <section aria-labelledby="weapon-heading">
-        <DataTable
-          title="بيانات السلاح"
-          icon={Crosshair}
-          badgeText={`${WEAPON_DATA.length} حقول`}
-          data={WEAPON_DATA}
-        />
-      </section>
+      {/* ─── رسالة خطأ ─── */}
+      {error && (
+        <Card className="border-red-500/30 bg-red-950/30">
+          <CardContent className="flex items-center gap-3 py-3">
+            <AlertTriangle className="w-5 h-5 text-red-400 shrink-0" />
+            <p className="text-red-300 text-sm">{error}</p>
+          </CardContent>
+        </Card>
+      )}
 
-      {/* ═══════════════════════════════════════════════════════════════ */}
-      {/* القسم ب — جداول الاستيفاء                                     */}
-      {/* ═══════════════════════════════════════════════════════════════ */}
-      <section aria-labelledby="lookup-heading">
-        <DataTable
-          title="جداول الاستيفاء"
-          icon={Table2}
-          badgeText={`${LOOKUP_DATA.length} حقول`}
-          data={LOOKUP_DATA}
-        />
-      </section>
+      {/* ─── رسالة نجاح ─── */}
+      {hasComputed && !error && engineOutput && (
+        <Card className="border-emerald-500/30 bg-emerald-950/30">
+          <CardContent className="flex items-center gap-3 py-3">
+            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+            <p className="text-emerald-300 text-sm">
+              تم الحساب بنجاح — انتقل إلى صفحات النتائج للاطلاع على التفاصيل
+            </p>
+            <Badge variant="outline" className="text-emerald-400 border-emerald-500/30 mr-auto">
+              {engineOutput.status === 'SUCCESS' ? 'نجاح' : engineOutput.status === 'PARTIAL' ? 'جزئي' : 'فشل'}
+            </Badge>
+          </CardContent>
+        </Card>
+      )}
 
-      {/* ═══════════════════════════════════════════════════════════════ */}
-      {/* القسم ج — البيانات الهندسية                                   */}
-      {/* ═══════════════════════════════════════════════════════════════ */}
-      <section aria-labelledby="geometry-heading">
-        <DataTable
-          title="البيانات الهندسية"
-          icon={Cuboid}
-          badgeText={`${GEOMETRY_DATA.length} حقول`}
-          data={GEOMETRY_DATA}
-        />
-      </section>
+      {/* ─── تبويبات المدخلات ─── */}
+      <Tabs defaultValue="weapon" className="space-y-4">
+        <TabsList className="bg-slate-900/60 border border-slate-800/60">
+          <TabsTrigger value="weapon" className="data-[state=active]:bg-cyan-600/20 data-[state=active]:text-cyan-300">
+            <Crosshair className="w-3.5 h-3.5 ml-1.5" />
+            القنبلة والهجوم
+          </TabsTrigger>
+          <TabsTrigger value="site" className="data-[state=active]:bg-emerald-600/20 data-[state=active]:text-emerald-300">
+            <Layers className="w-3.5 h-3.5 ml-1.5" />
+            الموقع والتربة
+          </TabsTrigger>
+          <TabsTrigger value="structure" className="data-[state=active]:bg-amber-600/20 data-[state=active]:text-amber-300">
+            <Building2 className="w-3.5 h-3.5 ml-1.5" />
+            أبعاد المنشأة
+          </TabsTrigger>
+          <TabsTrigger value="materials" className="data-[state=active]:bg-purple-600/20 data-[state=active]:text-purple-300">
+            <Shield className="w-3.5 h-3.5 ml-1.5" />
+            المواد
+          </TabsTrigger>
+        </TabsList>
 
-      {/* ═══════════════════════════════════════════════════════════════ */}
-      {/* حالة القفل                                                    */}
-      {/* ═══════════════════════════════════════════════════════════════ */}
-      <Card className="bg-slate-900/80 border-slate-800/60 overflow-hidden">
-        <div className="h-0.5 bg-amber-500/40" />
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-semibold text-slate-200 flex items-center gap-2">
-            <ShieldCheck className="size-4 text-amber-400" />
-            حالة القفل — الحالة المرجعية BMK-02
+        {/* ═══ تبويب القنبلة ═══ */}
+        <TabsContent value="weapon">
+          <Card className="border-slate-800/60 bg-slate-950/80">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-slate-200 text-base flex items-center gap-2">
+                <Crosshair className="w-4 h-4 text-cyan-400" />
+                بيانات السلاح والهجوم
+              </CardTitle>
+              <CardDescription className="text-slate-500 text-xs">
+                اختر القنبلة من المكتبة وحدد معطيات الاصطدام
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {/* اختيار القنبلة */}
+              <div className="space-y-2">
+                <Label className="text-slate-300 text-xs font-bold">اختر القنبلة من المكتبة</Label>
+                <Select
+                  value={userInput.weaponId}
+                  onValueChange={(v) => updateField('weaponId', v)}
+                >
+                  <SelectTrigger className="bg-slate-900/80 border-slate-700 text-slate-100 h-10">
+                    <SelectValue placeholder="اختر قنبلة..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-900 border-slate-700 max-h-64">
+                    {WEAPONS.map(w => (
+                      <SelectItem key={w.id} value={w.id} className="text-slate-200 focus:bg-slate-800 focus:text-slate-100">
+                        <span className="font-bold">{w.nameAr}</span>
+                        <span className="text-slate-500 mr-2">— {w.weightKg} كغ | شحنة {w.chargeKg} كغ</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* بطاقة القنبلة المختارة */}
+              {selectedWeapon && (
+                <Card className="border-cyan-500/20 bg-cyan-950/20">
+                  <CardContent className="py-3">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                      <div>
+                        <span className="text-slate-500">الوزن الكلي</span>
+                        <p className="text-cyan-300 font-mono font-bold">{selectedWeapon.weightKg} kg</p>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">القطر</span>
+                        <p className="text-cyan-300 font-mono font-bold">{selectedWeapon.diameterMeters} m</p>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">الشحنة</span>
+                        <p className="text-cyan-300 font-mono font-bold">{selectedWeapon.chargeKg} kg</p>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">نسبة L/D</span>
+                        <p className="text-cyan-300 font-mono font-bold">{selectedWeapon.ldRatio}</p>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">نسبة Lh/D</span>
+                        <p className="text-cyan-300 font-mono font-bold">{selectedWeapon.lhdRatio}</p>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">الطول</span>
+                        <p className="text-cyan-300 font-mono font-bold">{selectedWeapon.lengthMeters} m</p>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">نوع المتفجرات</span>
+                        <p className="text-cyan-300 font-mono font-bold">{selectedWeapon.explosive}</p>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">الأصل</span>
+                        <p className="text-cyan-300 font-mono font-bold">{selectedWeapon.origin === 'US' ? 'أمريكي' : selectedWeapon.origin === 'RU' ? 'روسي' : 'أخرى'}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              <Separator className="bg-slate-800/60" />
+
+              {/* معطيات الاصطدام */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <NumberField
+                  label="سرعة الاصطدام"
+                  symbol="V"
+                  unit="m/s"
+                  value={userInput.impactVelocity}
+                  onChange={(v) => updateField('impactVelocity', v)}
+                  min={50}
+                  max={1500}
+                  step={10}
+                  description="السرعة عند لحظة اصطدام القنبلة بالأرض أو المنشأة"
+                />
+                <NumberField
+                  label="زاوية الاصطدام"
+                  symbol="α"
+                  unit="درجة"
+                  value={userInput.impactAngleDeg}
+                  onChange={(v) => updateField('impactAngleDeg', v)}
+                  min={0}
+                  max={90}
+                  step={1}
+                  description="الزاوية بين مسار القنبلة والخط العمودي (0 = عمودي)"
+                />
+                <NumberField
+                  label="زاوية ميول الجبل"
+                  symbol="β"
+                  unit="درجة"
+                  value={userInput.slopeAngleDeg}
+                  onChange={(v) => updateField('slopeAngleDeg', v)}
+                  min={0}
+                  max={60}
+                  step={1}
+                  description="زاوية ميل سطح الأرض فوق المنشأة"
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ═══ تبويب الموقع والتربة ═══ */}
+        <TabsContent value="site">
+          <Card className="border-slate-800/60 bg-slate-950/80">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-slate-200 text-base flex items-center gap-2">
+                <Layers className="w-4 h-4 text-emerald-400" />
+                الموقع والتربة
+              </CardTitle>
+              <CardDescription className="text-slate-500 text-xs">
+                حدد نوع التربة وعمق المنشأة تحت سطح الأرض
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {/* اختيار نوع التربة */}
+              <div className="space-y-2">
+                <Label className="text-slate-300 text-xs font-bold">نوع التربة في موقع الإنشاء</Label>
+                <Select
+                  value={userInput.soilTypeCode}
+                  onValueChange={(v) => updateField('soilTypeCode', v as SoilTypeCode)}
+                >
+                  <SelectTrigger className="bg-slate-900/80 border-slate-700 text-slate-100 h-10">
+                    <SelectValue placeholder="اختر نوع التربة..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-900 border-slate-700">
+                    {SOILS.map(s => (
+                      <SelectItem key={s.code} value={s.code} className="text-slate-200 focus:bg-slate-800 focus:text-slate-100">
+                        <span className="font-bold">{s.nameAr}</span>
+                        <span className="text-slate-500 mr-2">— كثافة {s.densityKgM3} كغ/م³</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* بطاقة التربة المختارة */}
+              {selectedSoil && (
+                <Card className="border-emerald-500/20 bg-emerald-950/20">
+                  <CardContent className="py-3">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                      <div>
+                        <span className="text-slate-500">معامل الاختراق kₚ</span>
+                        <p className="text-emerald-300 font-mono font-bold">{selectedSoil.kp.toExponential(2)}</p>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">معامل السرعة kᵥ</span>
+                        <p className="text-emerald-300 font-mono font-bold">{selectedSoil.kv}</p>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">الكثافة</span>
+                        <p className="text-emerald-300 font-mono font-bold">{selectedSoil.densityKgM3} kg/m³</p>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">معامل التدمير</span>
+                        <p className="text-emerald-300 font-mono font-bold">{selectedSoil.destructionCoeff ?? '—'}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              <Separator className="bg-slate-800/60" />
+
+              {/* عمق المنشأة */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <NumberField
+                  label="عمق توضع المنشأة"
+                  symbol="Z"
+                  unit="m"
+                  value={userInput.facilityDepth}
+                  onChange={(v) => updateField('facilityDepth', v)}
+                  min={0.5}
+                  max={50}
+                  step={0.1}
+                  description="المسافة العمودية من سطح الأرض إلى سقف المنشأة"
+                />
+                <NumberField
+                  label="سماكة طبقة التمويه"
+                  symbol="h_obs"
+                  unit="m"
+                  value={userInput.concealmentThickness}
+                  onChange={(v) => updateField('concealmentThickness', v)}
+                  min={0}
+                  max={5}
+                  step={0.1}
+                  description="سماكة الطبقة العلوية للتمويه والحماية"
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ═══ تبويب أبعاد المنشأة ═══ */}
+        <TabsContent value="structure">
+          <Card className="border-slate-800/60 bg-slate-950/80">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-slate-200 text-base flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-amber-400" />
+                أبعاد المنشأة
+              </CardTitle>
+              <CardDescription className="text-slate-500 text-xs">
+                حدد أبعاد النفق أو المقر والسماكات الأولية المقترحة
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {/* أبعاد المسقط */}
+              <div>
+                <p className="text-slate-400 text-xs font-bold mb-3 flex items-center gap-1.5">
+                  <Info className="w-3 h-3" />
+                  أبعاد المسقط الأفقي
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <NumberField
+                    label="المجاز القصير"
+                    symbol="aₚ"
+                    unit="m"
+                    value={userInput.shortSpan}
+                    onChange={(v) => updateField('shortSpan', v)}
+                    min={1}
+                    max={20}
+                    step={0.5}
+                    description="البحر القصير للنفق"
+                  />
+                  <NumberField
+                    label="المجاز الطويل"
+                    symbol="bₚ"
+                    unit="m"
+                    value={userInput.longSpan}
+                    onChange={(v) => updateField('longSpan', v)}
+                    min={1}
+                    max={30}
+                    step={0.5}
+                    description="البحر الطويل للنفق"
+                  />
+                  <NumberField
+                    label="طول المنشأة"
+                    symbol="Lₖ"
+                    unit="m"
+                    value={userInput.facilityLength}
+                    onChange={(v) => updateField('facilityLength', v)}
+                    min={5}
+                    max={500}
+                    step={5}
+                    description="الطول الكلي للمنشأة"
+                  />
+                  <NumberField
+                    label="عرض المنشأة"
+                    symbol="Bₖ"
+                    unit="m"
+                    value={userInput.facilityWidth}
+                    onChange={(v) => updateField('facilityWidth', v)}
+                    min={3}
+                    max={100}
+                    step={1}
+                    description="العرض الكلي للمنشأة"
+                  />
+                </div>
+              </div>
+
+              <Separator className="bg-slate-800/60" />
+
+              {/* الارتفاع */}
+              <div>
+                <p className="text-slate-400 text-xs font-bold mb-3">الارتفاع الداخلي</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <NumberField
+                    label="ارتفاع السقف الداخلي"
+                    symbol="a_et"
+                    unit="m"
+                    value={userInput.ceilingHeight}
+                    onChange={(v) => updateField('ceilingHeight', v)}
+                    min={1.5}
+                    max={15}
+                    step={0.5}
+                    description="الارتفاع الصافي داخل النفق"
+                  />
+                </div>
+              </div>
+
+              <Separator className="bg-slate-800/60" />
+
+              {/* السماكات الأولية */}
+              <div>
+                <p className="text-slate-400 text-xs font-bold mb-3 flex items-center gap-1.5">
+                  <Info className="w-3 h-3" />
+                  السماكات الأولية المقترحة (سيتم التحقق منها حسابياً)
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <NumberField
+                    label="سماكة السقف المقترحة"
+                    symbol="Hₚ"
+                    unit="cm"
+                    value={userInput.initialCeilingThickness}
+                    onChange={(v) => updateField('initialCeilingThickness', v)}
+                    min={20}
+                    max={300}
+                    step={5}
+                    description="السماكة الأولية المقترحة لسقف المنشأة"
+                  />
+                  <NumberField
+                    label="سماكة الجدار الخارجي"
+                    symbol="Hct"
+                    unit="cm"
+                    value={userInput.initialWallThickness}
+                    onChange={(v) => updateField('initialWallThickness', v)}
+                    min={20}
+                    max={200}
+                    step={5}
+                    description="السماكة الأولية للجدران الخارجية"
+                  />
+                  <NumberField
+                    label="سماكة الأرضية"
+                    symbol="Hf"
+                    unit="cm"
+                    value={userInput.initialFloorThickness}
+                    onChange={(v) => updateField('initialFloorThickness', v)}
+                    min={15}
+                    max={150}
+                    step={5}
+                    description="سماكة بلاطة الأرضية"
+                  />
+                  <NumberField
+                    label="سماكة الجدران الداخلية"
+                    symbol="Hvct"
+                    unit="cm"
+                    value={userInput.innerWallThickness}
+                    onChange={(v) => updateField('innerWallThickness', v)}
+                    min={15}
+                    max={100}
+                    step={5}
+                    description="سماكة الجدران الداخلية الفاصلة"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ═══ تبويب المواد ═══ */}
+        <TabsContent value="materials">
+          <Card className="border-slate-800/60 bg-slate-950/80">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-slate-200 text-base flex items-center gap-2">
+                <Shield className="w-4 h-4 text-purple-400" />
+                خصائص المواد الإنشائية
+              </CardTitle>
+              <CardDescription className="text-slate-500 text-xs">
+                اختر درجة الخرسانة والحديد أو أدخل القيم يدوياً
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* درجة الخرسانة */}
+                <div className="space-y-2">
+                  <Label className="text-slate-300 text-xs font-bold">درجة الخرسانة</Label>
+                  <Select
+                    value={userInput.concreteGrade}
+                    onValueChange={handleConcreteGradeChange}
+                  >
+                    <SelectTrigger className="bg-slate-900/80 border-slate-700 text-slate-100 h-10">
+                      <SelectValue placeholder="اختر درجة الخرسانة..." />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-900 border-slate-700">
+                      {CONCRETE_GRADES.map(g => (
+                        <SelectItem key={g.grade} value={g.grade} className="text-slate-200 focus:bg-slate-800">
+                          <span className="font-bold">{g.grade}</span>
+                          <span className="text-slate-500 mr-2">— {g.labelAr}</span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* درجة الحديد */}
+                <div className="space-y-2">
+                  <Label className="text-slate-300 text-xs font-bold">درجة الحديد</Label>
+                  <Select
+                    value={userInput.steelGrade}
+                    onValueChange={handleSteelGradeChange}
+                  >
+                    <SelectTrigger className="bg-slate-900/80 border-slate-700 text-slate-100 h-10">
+                      <SelectValue placeholder="اختر درجة الحديد..." />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-900 border-slate-700">
+                      {STEEL_GRADES.map(g => (
+                        <SelectItem key={g.grade} value={g.grade} className="text-slate-200 focus:bg-slate-800">
+                          <span className="font-bold">{g.grade}</span>
+                          <span className="text-slate-500 mr-2">— {g.labelAr}</span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <Separator className="bg-slate-800/60" />
+
+              {/* القيم الرقمية */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <NumberField
+                  label="مقاومة ضغط الخرسانة"
+                  symbol="f'c"
+                  unit="MPa"
+                  value={userInput.fcMpa}
+                  onChange={(v) => updateField('fcMpa', v)}
+                  min={10}
+                  max={60}
+                  step={0.5}
+                  description="المقاومة التصميمية للضغط"
+                />
+                <NumberField
+                  label="إجهاد خضوع الحديد"
+                  symbol="fy"
+                  unit="MPa"
+                  value={userInput.fyMpa}
+                  onChange={(v) => updateField('fyMpa', v)}
+                  min={200}
+                  max={700}
+                  step={10}
+                  description="إجهاد الخضوع التصميمي"
+                />
+                <NumberField
+                  label="كثافة الخرسانة"
+                  symbol="γb"
+                  unit="kg/m³"
+                  value={userInput.concreteDensity}
+                  onChange={(v) => updateField('concreteDensity', v)}
+                  min={2000}
+                  max={3000}
+                  step={50}
+                  description="الوزن الحجمي للخرسانة المسلحة"
+                />
+                <NumberField
+                  label="معامل مرونة الحديد"
+                  symbol="Ea"
+                  unit="kg/cm²"
+                  value={userInput.steelElasticModulus}
+                  onChange={(v) => updateField('steelElasticModulus', v)}
+                  min={1000000}
+                  max={3000000}
+                  step={100000}
+                  description="معامل المرونة للتسليح"
+                />
+              </div>
+
+              <Separator className="bg-slate-800/60" />
+
+              {/* معاملات إضافية */}
+              <div>
+                <p className="text-slate-400 text-xs font-bold mb-3 flex items-center gap-1.5">
+                  <Info className="w-3 h-3" />
+                  معاملات ديناميكية إضافية (يمكن ترك القيم الافتراضية)
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <NumberField
+                    label="معامل ديناميكي للسقف"
+                    symbol="ψₚ"
+                    unit="—"
+                    value={userInput.psiP}
+                    onChange={(v) => updateField('psiP', v)}
+                    min={0.001}
+                    max={0.1}
+                    step={0.001}
+                    description="معامل السلوك الديناميكي للسقف"
+                  />
+                  <NumberField
+                    label="معامل طبقة توزيع الضغط"
+                    symbol="ρp.c"
+                    unit="—"
+                    value={userInput.rhoPc}
+                    onChange={(v) => updateField('rhoPc', v)}
+                    min={50}
+                    max={500}
+                    step={10}
+                    description="معامل توزيع الضغط عبر طبقة الحماية"
+                  />
+                  <NumberField
+                    label="معامل التربة حول الجدار"
+                    symbol="ρг"
+                    unit="—"
+                    value={userInput.rhoG}
+                    onChange={(v) => updateField('rhoG', v)}
+                    min={50}
+                    max={500}
+                    step={10}
+                    description="معامل تفاعل التربة مع الجدران"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* ─── ملخص المدخلات ─── */}
+      <Card className="border-slate-800/60 bg-slate-950/80">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-slate-200 text-base flex items-center gap-2">
+            <Info className="w-4 h-4 text-blue-400" />
+            ملخص المدخلات الحالية
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {/* بيانات السلاح */}
-            <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/40">
-              <div className="flex items-center gap-2 mb-3">
-                <Crosshair className="size-4 text-emerald-400" />
-                <span className="text-xs font-semibold text-slate-300">
-                  بيانات السلاح
-                </span>
-                <Lock className="size-3 text-amber-500/70 mr-auto" />
-              </div>
-              <div className="space-y-1.5">
-                <div className="flex justify-between items-center">
-                  <span className="text-[11px] text-slate-500">السلاح</span>
-                  <Badge
-                    variant="outline"
-                    className="border-emerald-500/30 text-emerald-400 text-[10px] px-1.5 py-0"
-                  >
-                    MK-83
-                  </Badge>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-[11px] text-slate-500">المتفجرات</span>
-                  <Badge
-                    variant="outline"
-                    className="border-slate-600 text-slate-300 text-[10px] px-1.5 py-0"
-                  >
-                    Tritonal 80/20
-                  </Badge>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-[11px] text-slate-500">الحقول</span>
-                  <span className="text-[11px] text-emerald-400 font-mono">
-                    {WEAPON_DATA.length} مقفل
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* جداول الاستيفاء */}
-            <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/40">
-              <div className="flex items-center gap-2 mb-3">
-                <Table2 className="size-4 text-emerald-400" />
-                <span className="text-xs font-semibold text-slate-300">
-                  جداول الاستيفاء
-                </span>
-                <Lock className="size-3 text-amber-500/70 mr-auto" />
-              </div>
-              <div className="space-y-1.5">
-                <div className="flex justify-between items-center">
-                  <span className="text-[11px] text-slate-500">التربة</span>
-                  <Badge
-                    variant="outline"
-                    className="border-slate-600 text-slate-300 text-[10px] px-1.5 py-0"
-                  >
-                    MEDIUM_SOIL
-                  </Badge>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-[11px] text-slate-500">المصدر</span>
-                  <span className="text-[11px] text-slate-400">
-                    الكود السوري / UFC
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-[11px] text-slate-500">الحقول</span>
-                  <span className="text-[11px] text-emerald-400 font-mono">
-                    {LOOKUP_DATA.length} مقفل
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* البيانات الهندسية */}
-            <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/40">
-              <div className="flex items-center gap-2 mb-3">
-                <Cuboid className="size-4 text-emerald-400" />
-                <span className="text-xs font-semibold text-slate-300">
-                  البيانات الهندسية
-                </span>
-                <Lock className="size-3 text-amber-500/70 mr-auto" />
-              </div>
-              <div className="space-y-1.5">
-                <div className="flex justify-between items-center">
-                  <span className="text-[11px] text-slate-500">النوع</span>
-                  <Badge
-                    variant="outline"
-                    className="border-slate-600 text-slate-300 text-[10px] px-1.5 py-0"
-                  >
-                    منشأة وقائية
-                  </Badge>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-[11px] text-slate-500">المرجع</span>
-                  <span className="text-[11px] text-slate-400">
-                    BMK-02 (مقفل)
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-[11px] text-slate-500">الحقول</span>
-                  <span className="text-[11px] text-emerald-400 font-mono">
-                    {GEOMETRY_DATA.length} مقفل
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* ملخص القفل */}
-          <div className="mt-4 p-3 bg-amber-500/5 border border-amber-500/15 rounded-lg flex items-center gap-3">
-            <Lock className="size-4 text-amber-400 shrink-0" />
-            <div>
-              <p className="text-xs text-amber-300/90 font-semibold">
-                جميع القيم مرجعية مقفلة لحالة BMK-02
-              </p>
-              <p className="text-[11px] text-slate-500 mt-0.5">
-                هذه القيم لا يمكن تعديلها — تُستخدم كأساس لحسابات الخطوات اللاحقة
-                (3→8). أي تعديل يتطلب إنشاء سيناريو جديد.
-              </p>
-            </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            <SummaryChip label="القنبلة" value={selectedWeapon?.nameAr ?? '—'} color="cyan" />
+            <SummaryChip label="التربة" value={selectedSoil?.nameAr ?? '—'} color="emerald" />
+            <SummaryChip label="السرعة" value={`${userInput.impactVelocity} m/s`} color="cyan" />
+            <SummaryChip label="العمق" value={`${userInput.facilityDepth} m`} color="emerald" />
+            <SummaryChip label="الخرسانة" value={userInput.concreteGrade} color="purple" />
+            <SummaryChip label="الحديد" value={userInput.steelGrade} color="purple" />
+            <SummaryChip label="المجاز القصير" value={`${userInput.shortSpan} m`} color="amber" />
+            <SummaryChip label="المجاز الطويل" value={`${userInput.longSpan} m`} color="amber" />
+            <SummaryChip label="سماكة السقف" value={`${userInput.initialCeilingThickness} cm`} color="amber" />
+            <SummaryChip label="سماكة الجدار" value={`${userInput.initialWallThickness} cm`} color="amber" />
           </div>
         </CardContent>
       </Card>
 
-      {/* ═══════════════════════════════════════════════════════════════ */}
-      {/* ملخص سريع — البطاقات                                          */}
-      {/* ═══════════════════════════════════════════════════════════════ */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Card className="bg-slate-900/80 border-slate-800/60 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/10 to-emerald-600/0 opacity-50 pointer-events-none" />
-          <CardContent className="p-4 relative">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="size-2 rounded-full bg-emerald-500" />
-              <span className="text-[10px] text-slate-500">وزن القنبلة</span>
-            </div>
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-2xl font-bold font-mono text-emerald-400">
-                {STEP2_INPUTS.P}
-              </span>
-              <span className="text-xs text-slate-500">kg</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-slate-900/80 border-slate-800/60 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-b from-amber-500/10 to-amber-600/0 opacity-50 pointer-events-none" />
-          <CardContent className="p-4 relative">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="size-2 rounded-full bg-amber-500" />
-              <span className="text-[10px] text-slate-500">سرعة الاصطدام</span>
-            </div>
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-2xl font-bold font-mono text-amber-400">
-                {STEP2_INPUTS.V}
-              </span>
-              <span className="text-xs text-slate-500">m/s</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-slate-900/80 border-slate-800/60 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-b from-red-500/10 to-red-600/0 opacity-50 pointer-events-none" />
-          <CardContent className="p-4 relative">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="size-2 rounded-full bg-red-500" />
-              <span className="text-[10px] text-slate-500">وزن الشحنة</span>
-            </div>
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-2xl font-bold font-mono text-red-400">
-                {STEP2_INPUTS.C}
-              </span>
-              <span className="text-xs text-slate-500">kg</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-slate-900/80 border-slate-800/60 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-b from-sky-500/10 to-sky-600/0 opacity-50 pointer-events-none" />
-          <CardContent className="p-4 relative">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="size-2 rounded-full bg-sky-500" />
-              <span className="text-[10px] text-slate-500">عمق السقف</span>
-            </div>
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-2xl font-bold font-mono text-sky-400">
-                {STEP2_INPUTS.Z}
-              </span>
-              <span className="text-xs text-slate-500">m</span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* ═══════════════════════════════════════════════════════════════ */}
-      {/* التنقل بين الخطوات                                            */}
-      {/* ═══════════════════════════════════════════════════════════════ */}
-      <Separator className="bg-slate-800/60" />
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-3 pb-4">
+      {/* ─── زر الحساب الكبير ─── */}
+      <div className="flex justify-center py-4">
         <Button
-          variant="outline"
-          className="border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-slate-100 gap-2 w-full sm:w-auto"
-          onClick={() => {
-            if (typeof window !== 'undefined') {
-              window.location.href = '/dashboard';
-            }
-          }}
+          onClick={runComputation}
+          disabled={isComputing}
+          size="lg"
+          className="bg-gradient-to-l from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-base px-12 h-14 shadow-lg shadow-cyan-900/30"
         >
-          <ChevronRight className="size-4" />
-          ← لوحة التحكم
-        </Button>
-        <Button
-          className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 w-full sm:w-auto"
-          onClick={() => {
-            if (typeof window !== 'undefined') {
-              window.location.href = '/dashboard/step3-penetration';
-            }
-          }}
-        >
-          التالي ← حسابات الاختراق
-          <ChevronLeft className="size-4" />
+          {isComputing ? (
+            <>
+              <Loader2 className="w-5 h-5 ml-2 animate-spin" />
+              جاري الحساب...
+            </>
+          ) : (
+            <>
+              <Zap className="w-5 h-5 ml-2" />
+              شغّل المحرك — احصل على التصميم الكامل
+            </>
+          )}
         </Button>
       </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// مكون مساعد — شريحة ملخص
+// ═══════════════════════════════════════════════════════════════════════
+
+function SummaryChip({ label, value, color }: { label: string; value: string; color: string }) {
+  const colorMap: Record<string, string> = {
+    cyan: 'border-cyan-500/30 bg-cyan-950/30 text-cyan-300',
+    emerald: 'border-emerald-500/30 bg-emerald-950/30 text-emerald-300',
+    amber: 'border-amber-500/30 bg-amber-950/30 text-amber-300',
+    purple: 'border-purple-500/30 bg-purple-950/30 text-purple-300',
+  };
+  return (
+    <div className={`rounded-lg border px-3 py-2 text-center ${colorMap[color] ?? colorMap.cyan}`}>
+      <p className="text-[10px] text-slate-500 mb-0.5">{label}</p>
+      <p className="text-xs font-mono font-bold">{value}</p>
     </div>
   );
 }
