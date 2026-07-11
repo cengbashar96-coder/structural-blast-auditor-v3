@@ -24,6 +24,7 @@ import {
   Settings,
   Info,
   Crown,
+  PenTool,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -53,6 +54,7 @@ const calcItems = [
   { title: 'تصميم السقف', href: '/dashboard/step7-ceiling', icon: Layers, badge: 'خطوة 7' },
   { title: 'تصميم الجدران', href: '/dashboard/step8-wall', icon: Building2, badge: 'خطوة 8' },
   { title: 'الأطروحة والمقارنة', href: '/dashboard/thesis-comparison', icon: BookOpen, badge: 'مقارنة' },
+  { title: 'الرسوم الهندسية', href: '/dashboard/structural-drawings', icon: PenTool, badge: 'رسم' },
 ];
 
 const toolItems = [
