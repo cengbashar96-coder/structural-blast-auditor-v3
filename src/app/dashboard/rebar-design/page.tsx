@@ -1,26 +1,24 @@
 // ═══════════════════════════════════════════════════════════════════════
 // صفحة تصميم التسليح — محرك الحديد والفحوصات
-// منصة المدقق الديناميكي الموحد V3.0
+// منصة المدقق الديناميكي الموحد V3.1
 // مساران مستقلان: السقف (Roof) والجدار (Wall)
-// مرجع القياس: BMK-02 (MK83 + MEDIUM_SOIL)
+// يعتمد على نتائج المحرك الفعلية عبر useEngine
 // ═══════════════════════════════════════════════════════════════════════
 
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   calculateRebarDesign,
-  calculateRebarBothPaths,
-  type RebarDesignInput,
+  calcFctmFromFc,
+  calcMinReinforcementRatio,
+  calcMaxReinforcementRatio,
   type RebarDesignOutput,
 } from '@/lib/engine/rebar';
-import {
-  STEP7_CEILING,
-  STEP5_ROOF,
-  STEP5_WALL,
-  STEP8_WALL,
-  STEP2_LOOKUPS,
-} from '@/lib/constants/reference-data';
+import { useEngine } from '@/lib/engine/engine-context';
+import { UFC_340_02 } from '@/lib/engine/constants';
+import { NoDataState } from '@/components/no-data-state';
+import type { GeometryType } from '@/lib/engine/types';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -768,31 +766,155 @@ function PathContent({
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+// أسماء الأشكال الهندسية بالعربية
+// ═══════════════════════════════════════════════════════════════════════
+
+const GEOMETRY_LABELS: Record<GeometryType, string> = {
+  RECTANGULAR: 'مستطيل',
+  CIRCULAR: 'دائري',
+  ARCHED: 'مقوس',
+};
+
+// ═══════════════════════════════════════════════════════════════════════
 // الصفحة الرئيسية
 // ═══════════════════════════════════════════════════════════════════════
 
 export default function RebarDesignPage() {
-  // حساب تصميم التسليح لكلا المسارين
-  const { roof: roofResult, wall: wallResult } = useMemo(() => {
-    return calculateRebarBothPaths(
-      {
-        Mp: STEP7_CEILING.Mp,
-        h0: STEP7_CEILING.h0,
-        Hp_final: STEP7_CEILING.Hp_final,
-      },
-      {
-        Mp: 10000000, // Mp_wall من STEP8_WALL
-        h0: STEP8_WALL.Hc_final / 1.05, // h0 ≈ Hc / 1.05
-        Hc_final: STEP8_WALL.Hc_final,
-      },
-      {
-        Rsd: STEP5_ROOF.Rsd,
-        Rbd: STEP5_ROOF.Rbd,
-        mu_struct_roof: STEP5_ROOF.mu_struct,
-        mu_struct_wall: STEP5_WALL.mu_struct,
+  const { userInput, engineOutput, hasComputed } = useEngine();
+  const [selectedGeo, setSelectedGeo] = useState<GeometryType>('RECTANGULAR');
+
+  // حساب Rsd و Rbd من مدخلات المستخدم الفعلية
+  const { RsdKgCm2, RbdKgCm2 } = useMemo(() => {
+    const n0 = 1.25;
+    const Rsd = userInput.fyMpa * 10.197 * UFC_340_02.DIF_STEEL_TENSION * n0;
+    const Rbd = userInput.fcMpa * 10.197 * UFC_340_02.DIF_CONCRETE_COMPRESSION * n0;
+    return { RsdKgCm2: Rsd, RbdKgCm2: Rbd };
+  }, [userInput.fyMpa, userInput.fcMpa]);
+
+  // حساب تصميم التسليح لكل شكل هندسي ولكل مسار
+  const rebarResults = useMemo(() => {
+    if (!engineOutput) return null;
+
+    const result: Record<GeometryType, { roof: RebarDesignOutput; wall: RebarDesignOutput }> = {
+      RECTANGULAR: undefined as any,
+      CIRCULAR: undefined as any,
+      ARCHED: undefined as any,
+    };
+
+    const geometries: GeometryType[] = ['RECTANGULAR', 'CIRCULAR', 'ARCHED'];
+    const blast = engineOutput.intermediates.blast;
+
+    // تحويل الضغط التصميمي إلى kg/cm²
+    const pDesignKgCm2 = blast.pDesignMpa * 10.197;
+
+    // الغطاء الخرساني وفق الكود السوري 2024 (50 mm = 5 cm)
+    const coverCm = 5;
+
+    for (const geo of geometries) {
+      const structural = engineOutput.structural[geo];
+      if (!structural || structural.requiredThicknessMeters <= 0) {
+        // بيانات غير صالحة — نستخدم قيم فارغة
+        result[geo] = {
+          roof: calculateRebarDesign({
+            Mp: 0,
+            h0: 0,
+            b: 100,
+            Rsd: RsdKgCm2,
+            Rbd: RbdKgCm2,
+            h: 0,
+            path: 'roof',
+            mu_struct: 0,
+            fcMpa: userInput.fcMpa,
+            fyMpa: userInput.fyMpa,
+          }),
+          wall: calculateRebarDesign({
+            Mp: 0,
+            h0: 0,
+            b: 100,
+            Rsd: RsdKgCm2,
+            Rbd: RbdKgCm2,
+            h: 0,
+            path: 'wall',
+            mu_struct: 0,
+            fcMpa: userInput.fcMpa,
+            fyMpa: userInput.fyMpa,
+          }),
+        };
+        continue;
       }
+
+      const hCm = structural.requiredThicknessMeters * 100; // السماكة الكلية بالـ cm
+      const h0Cm = hCm - coverCm; // العمق الفعال بالـ cm
+
+      // ═══ تسليح السقف ═══
+      // Mp = pDesign × ap² / 8 (لوح ببساطة بسيطة)
+      const apCm = userInput.shortSpan * 100; // المجاز القصير بالـ cm
+      const MpRoofKgCm = pDesignKgCm2 * apCm * apCm / 8;
+
+      const roofRebar = calculateRebarDesign({
+        Mp: MpRoofKgCm,
+        h0: h0Cm,
+        b: 100,
+        Rsd: RsdKgCm2,
+        Rbd: RbdKgCm2,
+        h: hCm,
+        path: 'roof',
+        mu_struct: structural.ductilityRatio,
+        fcMpa: userInput.fcMpa,
+        fyMpa: userInput.fyMpa,
+      });
+
+      // ═══ تسليح الجدار ═══
+      // للجدار: العزم يُحسب على المجاز الطويل bp
+      const bpCm = userInput.longSpan * 100; // المجاز الطويل بالـ cm
+      const MpWallKgCm = pDesignKgCm2 * bpCm * bpCm / 8;
+
+      // سماكة الجدار ≈ سماكة السقف (تقريب محافظ)
+      const wallHCm = hCm;
+      const wallH0Cm = wallHCm - coverCm;
+
+      const wallRebar = calculateRebarDesign({
+        Mp: MpWallKgCm,
+        h0: wallH0Cm,
+        b: 100,
+        Rsd: RsdKgCm2,
+        Rbd: RbdKgCm2,
+        h: wallHCm,
+        path: 'wall',
+        mu_struct: structural.ductilityRatio,
+        fcMpa: userInput.fcMpa,
+        fyMpa: userInput.fyMpa,
+      });
+
+      result[geo] = { roof: roofRebar, wall: wallRebar };
+    }
+
+    return result;
+  }, [engineOutput, RsdKgCm2, RbdKgCm2, userInput.fcMpa, userInput.fyMpa, userInput.shortSpan, userInput.longSpan]);
+
+  // إذا لم يتم الحساب بعد أو لا توجد مخرجات
+  if (!hasComputed || !engineOutput || !rebarResults) {
+    return (
+      <div className="space-y-6" dir="rtl">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-teal-500/10 border border-teal-500/30">
+            <Wrench className="size-6 text-teal-400" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-slate-100">تصميم التسليح</h1>
+            <p className="text-xs text-slate-500 mt-0.5">
+              حساب مساحة الحديد المطلوبة وفحص النسب الدنيا والقصوى — الكود السوري 2024 + UFC 3-340-02
+            </p>
+          </div>
+        </div>
+        <Separator className="bg-slate-800/60" />
+        <NoDataState />
+      </div>
     );
-  }, []);
+  }
+
+  const currentResult = rebarResults[selectedGeo];
+  const allGeometries: GeometryType[] = ['RECTANGULAR', 'CIRCULAR', 'ARCHED'];
 
   return (
     <div className="space-y-6" dir="rtl">
@@ -810,26 +932,65 @@ export default function RebarDesignPage() {
         <div className="mr-auto flex items-center gap-2">
           <Badge
             className={
-              roofResult.status === 'OK' && wallResult.status === 'OK'
+              currentResult.roof.status === 'OK' && currentResult.wall.status === 'OK'
                 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 text-xs'
-                : roofResult.status === 'FAILURE' || wallResult.status === 'FAILURE'
+                : currentResult.roof.status === 'FAILURE' || currentResult.wall.status === 'FAILURE'
                   ? 'bg-red-500/10 text-red-400 border-red-500/30 text-xs'
                   : 'bg-amber-500/10 text-amber-400 border-amber-500/30 text-xs'
             }
           >
-            {roofResult.status === 'OK' && wallResult.status === 'OK'
+            {currentResult.roof.status === 'OK' && currentResult.wall.status === 'OK'
               ? 'السقف والجدار: مقبول'
-              : roofResult.status === 'FAILURE' || wallResult.status === 'FAILURE'
+              : currentResult.roof.status === 'FAILURE' || currentResult.wall.status === 'FAILURE'
                 ? 'يوجد رفض'
                 : 'يوجد تحذير'}
-          </Badge>
-          <Badge className="bg-slate-800 text-slate-400 border-slate-700 text-[10px] px-1.5">
-            BMK-02
           </Badge>
         </div>
       </div>
 
       <Separator className="bg-slate-800/60" />
+
+      {/* ═══ اختيار الشكل الهندسي ═══ */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs text-slate-400 ml-2">الشكل الهندسي:</span>
+        {allGeometries.map((geo) => (
+          <button
+            key={geo}
+            onClick={() => setSelectedGeo(geo)}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-all ${
+              selectedGeo === geo
+                ? 'bg-teal-500/10 text-teal-400 border-teal-500/30'
+                : 'bg-slate-900/50 text-slate-400 border-slate-800/60 hover:bg-slate-800/50 hover:text-slate-300'
+            }`}
+          >
+            {GEOMETRY_LABELS[geo]}
+          </button>
+        ))}
+      </div>
+
+      {/* ═══ بطاقة معلومات المواد ═══ */}
+      <Card className="border-slate-800/60 bg-slate-950/50">
+        <CardContent className="p-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="text-center">
+              <p className="text-xs text-slate-500 mb-1">f&apos;c (خرسانة)</p>
+              <p className="text-base font-bold font-mono text-amber-400">{userInput.fcMpa} MPa</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-slate-500 mb-1">fy (حديد)</p>
+              <p className="text-base font-bold font-mono text-cyan-400">{userInput.fyMpa} MPa</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-slate-500 mb-1">R<sub>sd</sub> (ديناميكي)</p>
+              <p className="text-base font-bold font-mono text-emerald-400">{RsdKgCm2.toFixed(1)} kg/cm²</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-slate-500 mb-1">R<sub>bd</sub> (ديناميكي)</p>
+              <p className="text-base font-bold font-mono text-violet-400">{RbdKgCm2.toFixed(1)} kg/cm²</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* ═══ تبويبات المسارين ═══ */}
       <Tabs defaultValue="roof" dir="rtl" className="w-full">
@@ -840,7 +1001,7 @@ export default function RebarDesignPage() {
           >
             تسليح السقف
             <Badge className="bg-slate-800 text-slate-400 border-slate-700 text-[10px] mr-2 px-1.5 py-0">
-              {roofResult.status === 'OK' ? '✓' : roofResult.status === 'WARNING' ? '⚠' : '✗'}
+              {currentResult.roof.status === 'OK' ? '✓' : currentResult.roof.status === 'WARNING' ? '⚠' : '✗'}
             </Badge>
           </TabsTrigger>
           <TabsTrigger
@@ -849,19 +1010,19 @@ export default function RebarDesignPage() {
           >
             تسليح الجدار
             <Badge className="bg-slate-800 text-slate-400 border-slate-700 text-[10px] mr-2 px-1.5 py-0">
-              {wallResult.status === 'OK' ? '✓' : wallResult.status === 'WARNING' ? '⚠' : '✗'}
+              {currentResult.wall.status === 'OK' ? '✓' : currentResult.wall.status === 'WARNING' ? '⚠' : '✗'}
             </Badge>
           </TabsTrigger>
         </TabsList>
 
         {/* ═══ تبويب السقف ═══ */}
         <TabsContent value="roof" className="mt-6">
-          <PathContent data={roofResult} pathLabel="السقف" path="roof" />
+          <PathContent data={currentResult.roof} pathLabel="السقف" path="roof" />
         </TabsContent>
 
         {/* ═══ تبويب الجدار ═══ */}
         <TabsContent value="wall" className="mt-6">
-          <PathContent data={wallResult} pathLabel="الجدار" path="wall" />
+          <PathContent data={currentResult.wall} pathLabel="الجدار" path="wall" />
         </TabsContent>
       </Tabs>
     </div>

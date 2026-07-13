@@ -312,6 +312,9 @@ export function AdminDashboardV2() {
   const [currentUser, setCurrentUser] = useState<{ userId: string; displayName: string; role: string } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // خطأ قاعدة البيانات — للعرض في الواجهة مع خيارات الإصلاح
+  const [dbError, setDbError] = useState<string | null>(null);
+
   // إشعار
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -321,23 +324,47 @@ export function AdminDashboardV2() {
   /** تحميل البيانات الأولية */
   const loadData = useCallback(() => {
     startTransition(async () => {
+      setDbError(null);
       try {
-        const [statusResult, sessionResult, usersResult] = await Promise.all([
-          getBaselineLockStatusAction(),
-          checkSessionAction(),
-          getAllUsersAction(),
-        ]);
+        // ─── الخطوة ١: التحقق من الجلسة أولاً ───
+        const sessionResult = await checkSessionAction();
 
-        setIsLocked(statusResult.isLocked);
-
-        if (sessionResult.isAuthenticated && sessionResult.user) {
-          setCurrentUser(sessionResult.user);
+        if (!sessionResult.isAuthenticated || !sessionResult.user) {
+          setCurrentUser(null);
+          setIsLoading(false);
+          return;
         }
 
-        setUsers(usersResult.users);
-        setStats(usersResult.stats);
-      } catch {
-        showNotification('error', 'فشل تحميل البيانات الأولية');
+        setCurrentUser(sessionResult.user);
+
+        // ─── الخطوة ٢: تحميل البيانات (قد تفشل إذا كانت قاعدة البيانات غير متاحة) ───
+        try {
+          const [statusResult, usersResult] = await Promise.all([
+            getBaselineLockStatusAction(),
+            getAllUsersAction(),
+          ]);
+
+          setIsLocked(statusResult.isLocked);
+
+          // التحقق من خطأ إرجاعي من getAllUsersAction
+          if (usersResult.error) {
+            setDbError(usersResult.error);
+            showNotification('error', usersResult.error);
+          } else {
+            setUsers(usersResult.users);
+            setStats(usersResult.stats);
+          }
+        } catch (dataError: unknown) {
+          const errMsg = dataError instanceof Error ? dataError.message : 'خطأ غير معروف';
+          console.error('[AdminDashboard] Data loading failed:', errMsg);
+          setDbError(errMsg);
+          showNotification('error', `فشل تحميل البيانات: ${errMsg}`);
+        }
+      } catch (sessionError: unknown) {
+        const errMsg = sessionError instanceof Error ? sessionError.message : 'خطأ غير معروف';
+        console.error('[AdminDashboard] Session check failed:', errMsg);
+        // إذا فشل التحقق من الجلسة (ربما ENCRYPTION_KEY مفقود)، اعرض خطأ واضح
+        setDbError(`فشل التحقق من الجلسة: ${errMsg}`);
       } finally {
         setIsLoading(false);
       }
@@ -563,7 +590,7 @@ export function AdminDashboardV2() {
   }
 
   // ─── لا توجد جلسة صالحة ───
-  if (!currentUser) {
+  if (!currentUser && !dbError) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <Card className="w-full max-w-md border-red-900/30 bg-slate-800/40 backdrop-blur-sm">
@@ -575,6 +602,97 @@ export function AdminDashboardV2() {
             <Button asChild className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg">
               <a href="/auth/login">تسجيل الدخول</a>
             </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // ─── خطأ قاعدة البيانات — عرض خيارات الإصلاح ───
+  if (dbError) {
+    const isSessionError = dbError.includes('ENCRYPTION_KEY') || dbError.includes('الجلسة') || dbError.includes('session');
+    const isDbUnavailable = dbError.includes('قاعدة البيانات') || dbError.includes('fetch') || dbError.includes('ECONNREFUSED') || dbError.includes('Supabase') || dbError.includes('فشل جلب');
+
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Card className="w-full max-w-lg border-amber-900/30 bg-slate-800/40 backdrop-blur-sm">
+          <CardHeader className="text-center">
+            <CardTitle className="text-amber-400 flex items-center justify-center gap-2">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+              خطأ في تحميل البيانات
+            </CardTitle>
+            <CardDescription className="text-slate-400 mt-2">
+              {isSessionError
+                ? 'فشل التحقق من الجلسة — قد يكون مفتاح التشفير (ENCRYPTION_KEY) مفقود أو غير صالح'
+                : isDbUnavailable
+                ? 'قاعدة البيانات غير متاحة حالياً — تحقق من الاتصال أو استخدم الوضع الأوفلاين'
+                : 'حدث خطأ أثناء تحميل بيانات لوحة التحكم'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* تفاصيل الخطأ */}
+            <div className="rounded-lg bg-red-900/10 border border-red-900/20 p-3">
+              <p className="text-xs text-red-400 font-mono break-words" dir="ltr">{dbError}</p>
+            </div>
+
+            {/* خيارات الإصلاح */}
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-slate-300">خيارات الإصلاح:</p>
+
+              <div className="flex flex-col gap-2">
+                {isSessionError && (
+                  <div className="rounded-lg bg-slate-700/30 p-3 border border-slate-600/20">
+                    <p className="text-xs font-medium text-amber-400 mb-1">مفتاح التشفير مفقود</p>
+                    <p className="text-xs text-slate-400 mb-2">
+                      أضف ENCRYPTION_KEY إلى متغيرات البيئة (64 حرف hex):
+                    </p>
+                    <code className="text-[10px] text-emerald-400 bg-slate-900/50 px-2 py-1 rounded block" dir="ltr">
+                      node -e &quot;console.log(require(&apos;crypto&apos;).randomBytes(32).toString(&apos;hex&apos;))&quot;
+                    </code>
+                  </div>
+                )}
+
+                {isDbUnavailable && (
+                  <div className="rounded-lg bg-slate-700/30 p-3 border border-slate-600/20">
+                    <p className="text-xs font-medium text-blue-400 mb-1">الوضع الأوفلاين</p>
+                    <p className="text-xs text-slate-400 mb-2">
+                      يمكنك تفعيل الوضع الأوفلاين بإضافة FORCE_OFFLINE=true إلى متغيرات البيئة
+                    </p>
+                    <code className="text-[10px] text-emerald-400 bg-slate-900/50 px-2 py-1 rounded block" dir="ltr">
+                      FORCE_OFFLINE=true
+                    </code>
+                  </div>
+                )}
+
+                <Button
+                  className="w-full bg-amber-600 hover:bg-amber-500 text-white rounded-lg"
+                  disabled={isPending}
+                  onClick={handleSeedAdmin}
+                >
+                  بذر حساب المدير الافتراضي (cengbashar96@gmail.com)
+                </Button>
+
+                <Button
+                  variant="outline"
+                  className="w-full border-slate-600/50 text-slate-300 hover:bg-slate-700/50 rounded-lg"
+                  disabled={isPending}
+                  onClick={() => { setDbError(null); loadData(); }}
+                >
+                  إعادة المحاولة
+                </Button>
+
+                <Button
+                  variant="outline"
+                  className="w-full border-slate-600/50 text-slate-300 hover:bg-slate-700/50 rounded-lg"
+                  disabled={isPending}
+                  onClick={handleLogout}
+                >
+                  تسجيل الخروج وإعادة الدخول
+                </Button>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>

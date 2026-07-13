@@ -5,10 +5,6 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 import {
-  STEP2_LOOKUPS,
-  STEP7_CEILING,
-  STEP5_ROOF,
-  STEP5_WALL,
   assertLockedNotOverwritten,
 } from '@/lib/constants/reference-data';
 import { SYRIAN_CODE_2024, UFC_340_02 } from './constants';
@@ -35,6 +31,10 @@ export interface RebarDesignInput {
   path: 'roof' | 'wall';
   /** نسبة المطاوعة الإنشائية */
   mu_struct: number;
+  /** مقاومة ضغط الخرسانة f'c (MPa) — لحساب fctm */
+  fcMpa?: number;
+  /** إجهاد خضوع الحديد fy (MPa) — لحساب نسبة التسليح الدنيا */
+  fyMpa?: number;
 }
 
 /**
@@ -175,17 +175,36 @@ export function calcReinforcementRatio(As: number, b: number, h0: number): numbe
 }
 
 /**
+ * حساب مقاومة الشد المباشرة fctm من f'c
+ * وفق Eurocode 2: fctm = 0.30 × fck^(2/3) للحالات العادية
+ * حيث fck = fcMpa (المقاومة الاسطوانية المميزة)
+ * للخرسانة > C50/60: fctm = 2.12 × ln(1 + fcm/10)
+ */
+export function calcFctmFromFc(fcMpa: number): number {
+  if (fcMpa <= 0) return 2.6; // قيمة افتراضية آمنة
+  if (fcMpa <= 50) {
+    return 0.30 * Math.pow(fcMpa, 2 / 3);
+  }
+  return 2.12 * Math.log(1 + (fcMpa + 8) / 10);
+}
+
+/**
  * الحد الأدنى لنسبة التسليح — الكود السوري 2024
  * ρ_min = max(0.0025, 0.26 × fctm / fyk)
  *
- * للأحمال الديناميكية: ρ_min = 0.003 (0.3%)
+ * للأحمال الديناميكية: ρ_min = max(0.003, 0.26 × fctm × 1.25 / (fyk × 1.20))
+ * حيث 1.25 و 1.20 هما DIF للخرسانة والحديد
  */
 export function calcMinReinforcementRatio(
   fctm_MPa: number = 2.6,
-  fyk_MPa: number = 300,
+  fyk_MPa: number = 400,
   isDynamic: boolean = true
 ): number {
-  if (isDynamic) return 0.003;
+  if (isDynamic) {
+    // للأحمال الديناميكية — نأخذ القيمة الأكثر أماناً
+    const rhoCode = Math.max(0.0025, 0.26 * fctm_MPa / fyk_MPa);
+    return Math.max(0.003, rhoCode);
+  }
   return Math.max(0.0025, 0.26 * fctm_MPa / fyk_MPa);
 }
 
@@ -292,8 +311,10 @@ export function calculateRebarDesign(input: RebarDesignInput): RebarDesignOutput
   // 2. حساب نسبة التسليح
   const rho = calcReinforcementRatio(As_required, input.b, input.h0);
 
-  // 3. حدود التسليح
-  const rho_min = calcMinReinforcementRatio(2.6, 300, isDynamic);
+  // 3. حدود التسليح — استخدام f'c و fy الفعليين
+  const fctm = calcFctmFromFc(input.fcMpa ?? 30);
+  const fyk = input.fyMpa ?? 400;
+  const rho_min = calcMinReinforcementRatio(fctm, fyk, isDynamic);
   const rho_max = calcMaxReinforcementRatio(isDynamic);
 
   // 4. حساب العمق النسبي

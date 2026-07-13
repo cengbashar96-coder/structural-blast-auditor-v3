@@ -125,6 +125,7 @@ function toAdminUserView(user: {
  * هذا يضمن إمكانية الوصول الإداري الأولي دائماً.
  *
  * ⚠️ يجب تغيير كلمة المرور الافتراضية فور تسجيل الدخول الأول
+ * ✅ لا يتطلب مصادقة — يُستخدم لتهيئة النظام第一次
  */
 export async function seedDefaultAdminAction(): Promise<AdminActionResult> {
   const contextId = generateSovereignId('CTX');
@@ -133,7 +134,7 @@ export async function seedDefaultAdminAction(): Promise<AdminActionResult> {
     // التحقق من وجود مدير بالفعل
     const existingAdmin = await prisma.user.findFirst({
       where: { role: USER_ROLES.ADMIN },
-    });
+    }) as any;
 
     if (existingAdmin) {
       return {
@@ -166,7 +167,7 @@ export async function seedDefaultAdminAction(): Promise<AdminActionResult> {
         approvedBy: 'SYSTEM_SEED',
         statusChangedAt: new Date(),
       },
-    });
+    }) as any;
 
     dispatchToAuditQueue({
       contextId,
@@ -185,6 +186,7 @@ export async function seedDefaultAdminAction(): Promise<AdminActionResult> {
     return { success: true, contextId };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'خطأ غير معروف';
+    console.error('[AdminActions] seedDefaultAdminAction failed:', message);
 
     dispatchToAuditQueue({
       contextId,
@@ -210,13 +212,14 @@ export async function getAllUsersAction(): Promise<{
   users: AdminUserView[];
   stats: AdminUserStats;
   contextId: string;
+  error?: string;
 }> {
   const { contextId } = await requireAdmin();
 
   try {
     const users = await prisma.user.findMany({
       orderBy: { createdAt: 'desc' },
-    });
+    }) as any[];
 
     const stats: AdminUserStats = {
       total: users.length,
@@ -236,7 +239,14 @@ export async function getAllUsersAction(): Promise<{
     };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'خطأ غير معروف';
-    throw new Error(`فشل جلب قائمة المستخدمين: ${message}`);
+    console.error('[AdminActions] getAllUsersAction failed:', message);
+    // إرجاع خطأ بدلاً من رميه — ليسهل التعامل معه في الواجهة
+    return {
+      users: [],
+      stats: { total: 0, pending: 0, approved: 0, rejected: 0, suspended: 0, admins: 0, engineers: 0, viewers: 0 },
+      contextId,
+      error: `فشل جلب قائمة المستخدمين: ${message}`,
+    };
   }
 }
 

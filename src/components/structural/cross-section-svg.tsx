@@ -113,7 +113,7 @@ export function CrossSectionSVG({
       {geometryType === 'ARCHED' && archSection(cx, lW, rW, cT, cB, fT, fB, wallPx, ceilingPx, floorPx, iW, iH)}
 
       {/* Rebar */}
-      {rebarLines(lW, rW, cB, fT, wallPx)}
+      {rebarLines(lW, rW, cB, fT, wallPx, structural.requiredSteelAreaCm2PerMeter)}
 
       {/* Dimensions */}
       <DimLine x1={rW + wallPx + 8} y1={cT} x2={rW + wallPx + 8} y2={cB} label={`Hp = ${fmt(Hp * 100, 1)} cm`} side="right" color={C.result} highlight />
@@ -131,6 +131,12 @@ export function CrossSectionSVG({
           <text x={cx + 47} y={groundY + 12} textAnchor="middle" fill={C.blast} fontSize="8" filter="url(#ts)">hпр = {fmt(penetrationDepth, 2)} m</text>
         </g>
       )}
+
+      {/* Material properties label */}
+      <rect x={lW - wallPx - 60} y={cB + iH / 2 - 20} width="55" height="38" rx="3" fill="#0F172A" opacity="0.9" stroke="#334155" strokeWidth="0.5" />
+      <text x={lW - wallPx - 33} y={cB + iH / 2 - 8} textAnchor="middle" fill="#94A3B8" fontSize="6" fontWeight="bold">المواد</text>
+      <text x={lW - wallPx - 33} y={cB + iH / 2 + 2} textAnchor="middle" fill={C.steel} fontSize="7" fontWeight="bold">f'c = {fmt(userInput.fcMpa, 0)} MPa</text>
+      <text x={lW - wallPx - 33} y={cB + iH / 2 + 12} textAnchor="middle" fill="#38BDF8" fontSize="7" fontWeight="bold">fy = {fmt(userInput.fyMpa, 0)} MPa</text>
 
       {/* Steel area label */}
       <rect x={cx - 45} y={cB + iH / 2 - 8} width="90" height="22" rx="3" fill="#0F172A" opacity="0.85" />
@@ -199,15 +205,38 @@ function archSection(cx: number, lW: number, rW: number, cT: number, cB: number,
   </g>;
 }
 
-// ─── خطوط التسليح ───
-function rebarLines(lW: number, rW: number, cB: number, fT: number, wP: number) {
-  const sp = 6, lines = [];
-  for (let y = cB - 3; y >= cB - 12; y -= sp) lines.push(<line key={`c${y}`} x1={lW + 2} y1={y} x2={rW - 2} y2={y} stroke={C.steel} strokeWidth="0.8" />);
-  for (let y = cB; y < fT; y += sp) {
-    lines.push(<line key={`lw${y}`} x1={lW + 2} y1={y} x2={lW + wP - 2} y2={y} stroke={C.steel} strokeWidth="0.6" />);
-    lines.push(<line key={`rw${y}`} x1={rW - wP + 2} y1={y} x2={rW - 2} y2={y} stroke={C.steel} strokeWidth="0.6" />);
+// ─── خطوط التسليح — تعكس كمية الحديد المحسوبة ───
+function rebarLines(lW: number, rW: number, cB: number, fT: number, wP: number, AsCm2?: number) {
+  const lines = [];
+  // حساب تقريبي لعدد القضبان من مساحة التسليح
+  // As = n × π × d² / 4 → n ≈ As / (π × d² / 4)
+  // نفترض قطر 16mm كقطر شائع → مساحة القضيب = 2.01 cm²
+  const barArea = 2.01; // Φ16
+  const barCount = AsCm2 ? Math.max(Math.ceil(AsCm2 / barArea), 3) : 5;
+  const spacing = (rW - lW - 4) / barCount;
+  const barR = Math.min(Math.max(1.5, 3 - barCount * 0.1), 3);
+
+  // تسليح سقف (أعلى — أسفل الخرسانة مباشرة)
+  for (let i = 0; i < barCount; i++) {
+    const x = lW + 2 + spacing * (i + 0.5);
+    lines.push(<circle key={`cb${i}`} cx={x} cy={cB - 4} r={barR} fill={C.steel} fillOpacity="0.9" stroke="#B45309" strokeWidth="0.5" />);
   }
-  for (let y = fT + 3; y < fT + 10; y += sp) lines.push(<line key={`f${y}`} x1={lW + 2} y1={y} x2={rW - 2} y2={y} stroke={C.steel} strokeWidth="0.8" />);
+
+  // تسليح جدران (جانبي)
+  const wallBarCount = Math.max(Math.ceil(barCount * 0.6), 2);
+  const wallSpacing = (fT - cB) / (wallBarCount + 1);
+  for (let i = 1; i <= wallBarCount; i++) {
+    const y = cB + wallSpacing * i;
+    lines.push(<circle key={`lw${i}`} cx={lW + 3} cy={y} r={barR * 0.8} fill={C.steel} fillOpacity="0.7" stroke="#B45309" strokeWidth="0.4" />);
+    lines.push(<circle key={`rw${i}`} cx={rW - 3} cy={y} r={barR * 0.8} fill={C.steel} fillOpacity="0.7" stroke="#B45309" strokeWidth="0.4" />);
+  }
+
+  // تسليح أرضية
+  for (let i = 0; i < barCount; i++) {
+    const x = lW + 2 + spacing * (i + 0.5);
+    lines.push(<circle key={`fb${i}`} cx={x} cy={fT + 4} r={barR} fill={C.steel} fillOpacity="0.9" stroke="#B45309" strokeWidth="0.5" />);
+  }
+
   return <g>{lines}</g>;
 }
 
